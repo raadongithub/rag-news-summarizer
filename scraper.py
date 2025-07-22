@@ -9,6 +9,7 @@ from newspaper import Article
 from bs4 import BeautifulSoup, Comment
 import dateutil.parser
 from pydantic import BaseModel, HttpUrl, Field, field_validator
+import json
 
 
 
@@ -153,6 +154,7 @@ class NewsArticleScraper:
             for element in soup.select(selector):
                 element.decompose()
     
+    
     def extract_title(self, soup: BeautifulSoup) -> str:
         # Try multiple selectors in order of preference
         title_selectors = [
@@ -264,19 +266,8 @@ def main():
         scraper = NewsArticleScraper()
         article = scraper.scrape_article(url)
         
-        print("\n" + "="*50)
-        print("SCRAPED ARTICLE DATA")
-        print("="*50)
-        print(f"Title: {article.title}")
-        print(f"URL: {article.url}")
-        print(f"Source Domain: {article.source_domain}")
-        print(f"Authors: {', '.join(article.authors) if article.authors else 'Unknown'}")
-        print(f"Publish Date: {article.publish_date or 'Unknown'}")
-        print(f"Word Count: {article.word_count}")
-        print(f"Extraction Method: {article.extraction_method}")
-        print(f"\nContent Preview: ")
-        print("-" * 30)
-        print(article.content)
+        print(json.dumps(json.loads(article.model_dump_json()), indent=2, ensure_ascii=False, default=str))
+
         
     except ImportError as e:
         print(f"Missing dependency: {e}")
