@@ -1,0 +1,10 @@
+[project]
+name = "stixor-task"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "langchain-core>=0.3.70",
+    "langchain-google-genai>=2.1.8",
+]
