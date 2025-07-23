@@ -29,7 +29,7 @@ class SummaryGenerator:
     """
     def __init__(self):
         
-        self.llm = ChatOpenAI(model="gpt-4-turbo-preview", temperature=0.0)
+        self.llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.0)
         self.prompt_template = ChatPromptTemplate.from_messages(
             [
                 (
@@ -98,7 +98,7 @@ class SelfCritique:
     def __init__(self, openai_api_key: str):
         # Using ChatOpenAI with structured output to guarantee JSON for the critique
         self.llm = ChatOpenAI(
-            model="gpt-4-turbo-preview",
+            model="gpt-4.1-nano",
             temperature=0.0,
             api_key=openai_api_key
         ).with_structured_output(Critique)
