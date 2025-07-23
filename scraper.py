@@ -56,22 +56,24 @@ class NewsArticleScraper:
     
     def scrape_article(self, url: str) -> ScrapedArticle:
         
-        # Try newspaper3k first (primary method)
+        # Try newspaper3k first as primary method
         try:
             article_data = self.scrape_with_newspaper(url)
             return ScrapedArticle(**article_data)
         except Exception as e:
             logger.warning(f"Newspaper3k extraction failed: {str(e)}")
         
-        # Fallback to BeautifulSoup
+        # Fallback to BeautifulSoup if newspaper fails
         try:
-            article_data = self._scrape_with_beautifulsoup(url)
+            article_data = self.scrape_with_beautifulsoup(url)
             logger.info("Successfully extracted content using BeautifulSoup fallback")
             return ScrapedArticle(**article_data)
         except Exception as e:
             logger.error(f"BeautifulSoup extraction also failed: {str(e)}")
             raise ValueError(f"Failed to extract article content from {url}")
     
+
+    #Scraping with newspaper
     def scrape_with_newspaper(self, url: str) -> dict:
        
         try:
@@ -102,12 +104,14 @@ class NewsArticleScraper:
             logger.error(f"Newspaper3k failed: {e}")
             raise
     
-    def _scrape_with_beautifulsoup(self, url: str) -> dict:
+
+    #Scraping with beautifulsoup
+    def scrape_with_beautifulsoup(self, url: str) -> dict:
         response = self.session.get(url, timeout=self.timeout)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.content, 'html.parser')
-        self.remove_unwanted_elements(soup)
+        self.remove_extras(soup)
     
         title = self.extract_title(soup)
         content = self.extract_content(soup)
@@ -130,7 +134,9 @@ class NewsArticleScraper:
             'extraction_method': "beautifulsoup"
         }
     
-    def remove_unwanted_elements(self, soup: BeautifulSoup) -> None:
+
+    #Cleaning unwanted elements i.e boilerptale
+    def remove_extras(self, soup: BeautifulSoup) -> None:
 
         comments = soup.findAll(text=lambda text: isinstance(text, Comment))
         for comment in comments:
@@ -155,8 +161,9 @@ class NewsArticleScraper:
                 element.decompose()
     
     
-    def extract_title(self, soup: BeautifulSoup) -> str:
-        # Try multiple selectors in order of preference
+    # Extracts Titles
+    def extract_title(self, soup: BeautifulSoup) -> str:    
+
         title_selectors = [
             'h1.entry-title', 'h1.post-title', 'h1.article-title',
             'h1[class*="title"]', 'h1[class*="headline"]',
@@ -170,6 +177,8 @@ class NewsArticleScraper:
         
         return "No title found"
     
+
+    #Extracting news article body
     def extract_content(self, soup: BeautifulSoup) -> str:
         content_selectors = [
             'article', '.entry-content', '.post-content', '.article-content',
@@ -186,7 +195,7 @@ class NewsArticleScraper:
                     if len(content) > 200: #Making sure the extracted content is more than 200 
                         return content
         
-        # Fallback: find the longest text block
+        # Fallback strategy to find the longest text block
         all_paragraphs = soup.find_all('p')
         if all_paragraphs:
             content = '\n\n'.join(p.get_text().strip() for p in all_paragraphs if p.get_text().strip())
@@ -194,10 +203,11 @@ class NewsArticleScraper:
 
         return soup.get_text()
     
+
+    #Extracting Author
     def extract_authors(self, soup: BeautifulSoup) -> List[str]:
         authors = []
         
-    
         author_selectors = [
             '[class*="author"]', '[class*="byline"]', '[rel="author"]',
             '[itemprop="author"]', '.writer', '.journalist'
@@ -207,14 +217,15 @@ class NewsArticleScraper:
             elements = soup.select(selector)
             for element in elements:
                 author_text = element.get_text().strip()
-                if author_text and len(author_text) < 100:  # Reasonable author name length
-                    # Clean up author text
+                if author_text and len(author_text) < 100:  
                     author_text = re.sub(r'^(by|author:?)\s*', '', author_text, flags=re.IGNORECASE)
                     if author_text not in authors:
                         authors.append(author_text)
         
-        return authors[:1]  # Limit to 1 author max
+        return authors[:1]  # Only Limiting First author
     
+
+    # Extracting Publicate date
     def extract_publish_date(self, soup: BeautifulSoup) -> Optional[datetime]:
  
         date_selectors = [
@@ -237,7 +248,7 @@ class NewsArticleScraper:
         return None
     
 
-    
+    #final cleaning for normalizing text
     def clean_text(self, text: str) -> str:
         """Clean and normalize extracted text."""
         if not text:

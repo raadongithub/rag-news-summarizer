@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import numpy as np
 from dotenv import load_dotenv
@@ -8,7 +8,8 @@ from langchain_openai import OpenAIEmbeddings
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-class DensePassageRetriever:
+# using Dense Passage Retriever for retrieving relevant data by embedding context/query then implementing Cosine Similarity 
+class ContextRetriever:
 
     def __init__(self, openai_api_key: str):
 
@@ -16,13 +17,14 @@ class DensePassageRetriever:
             model="text-embedding-3-small", openai_api_key=openai_api_key
         )
 
-    def _chunk_content(
+    # Dividing content to smaller chunks
+    def split_to_chunks(
         self, content: str, chunk_size: int=50, chunk_overlap: int=10
     ) -> List[str]:
         if chunk_overlap >= chunk_size:
             raise ValueError("chunk_overlap must be smaller than chunk_size.")
 
-        # Split content into sentences, preserving punctuation
+        # Split content into sentences, preserving punctuation signs
         sentences = re.split(r"(?<=[.!?])\s+", content.strip())
         sentences = [s.strip() for s in sentences if s.strip()]
 
@@ -54,8 +56,8 @@ class DensePassageRetriever:
                 },
             }
 
-        # 1. Chunk the document
-        chunks = self._chunk_content(content, chunk_size, chunk_overlap)
+        # Chunks the document
+        chunks = self.split_to_chunks(content, chunk_size, chunk_overlap)
 
         if not chunks:
              return {
@@ -69,11 +71,11 @@ class DensePassageRetriever:
                 },
             }
 
-        # 2. Embed query and passages directly
+        # Embeds query and passages 
         query_embedding = np.array(self.embeddings.embed_query(query))
         passage_embeddings = np.array(self.embeddings.embed_documents(chunks))
 
-        # 3. Calculate similarity and find top-k passages
+        #Calculate similarity score and find top 3 passages
         similarities = cosine_similarity([query_embedding], passage_embeddings)[0]
         top_indices = np.argsort(similarities)[-k:][::-1]
 
@@ -81,7 +83,7 @@ class DensePassageRetriever:
             (chunks[idx], float(similarities[idx])) for idx in top_indices
         ]
 
-        # 4. Format and return the final result
+        # Formating final result
         return {
             "query": query,
             "retrieved_passages": [
@@ -96,44 +98,3 @@ class DensePassageRetriever:
             },
         }
 
-
-def main():
-    import os
-
-    load_dotenv()
-
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key:
-        raise ValueError("OPENAI_API_KEY environment variable is required")
-
-    # Initialize the retriever
-    retriever = DensePassageRetriever(openai_api_key)
-
-    # Sample data
-    sample_scraped_data = {
-        "url": "https://edition.cnn.com/2025/07/21/travel/barcelona-cruise-terminal-closures-scli-intl",
-        "title": "Barcelona is shutting two of its cruise-ship terminals to cut tourist numbers",
-        "content": "CNN — Barcelona's cruise-ship port is to close two of its terminals, as part of efforts to fight the city's overtourism problem. The closure, which will bring the number of operational terminals down to to five when it takes effect next year, is part of an agreement with Barcelona's city council, announced in a statement from the council Friday. The agreement also provides funding for a study to evaluate how cruise-ship passengers move around the city, which the council says is a first step in developing sustainable mobility plan. That move followed a 2018 agreement between the port authorities and the city council to 'move cruise activity away from urban areas… making them more sustainable,' the port authorities said in a statement at the time.",
-        "authors": ["Jack Guy"],
-        "publish_date": "2025-07-21T00:00:00",
-        "summary": "",
-        "source_domain": "edition.cnn.com",
-        "word_count": 420,
-        "extraction_method": "newspaper3k",
-    }
-
-    query = "What is Barcelona doing about overtourism?"
-
-    # Call the main retrieve method with custom chunking parameters
-    result = retriever.retrieve(
-        sample_scraped_data,
-        query,
-        k=2,  # Get top 2 results
-        chunk_size=2,  # 2 sentences per chunk
-        chunk_overlap=1,  # 1 sentence overlap
-    )
-    print(json.dumps(result, indent=2))
-
-
-if __name__ == "__main__":
-    main()
