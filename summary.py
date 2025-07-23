@@ -63,6 +63,33 @@ class SummaryGenerator:
 
 
 
+class ArticleSummarizer:
+    """
+    Generates a complete summary of the entire article content.
+    """
+    def __init__(self):
+        self.llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.7)
+        self.prompt_template = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are an expert news editor. Your task is to create a comprehensive and well-structured summary of the provided news article. The summary should only be 5-7 lines long only capturing the main events, key figures, and overall significance of the story. You must strictly not to use em-dashes or any sort of styling. Only return in plain-text."
+                ),
+                ("human", "Please summarize the following article:\n\n{content}"),
+            ]
+        )
+        self.chain = self.prompt_template | self.llm | StrOutputParser()
+
+    def generate(self, content: str) -> str:
+        """
+        Invokes LLM chain to generate full article summary
+        """
+        if not content.strip():
+            raise ValueError("Article content is empty, cannot generate a summary.")
+        
+        full_summary = self.chain.invoke({"content": content})
+        return full_summary.strip()
+
 # Separate LLM call for fair evaluation of response generated 
 class SelfCritique:
     """

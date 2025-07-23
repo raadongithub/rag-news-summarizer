@@ -1,0 +1,91 @@
+Please analyze the codebase and create a beautiful, Streamlit-based chatbot interface for my application with the following functionality: 
+
+
+
+ The default theme must be light. 
+
+
+
+ On the left sidebar, include a URL input field and a button labeled "Generate Article Summary". 
+
+
+
+ The overall interface theme and layout should closely resemble ChatGPT. 
+
+
+
+ The chat input field should be placed at the bottom-center of the main interface. 
+
+
+
+ The input box should have slightly rounded corners for a modern, clean appearance. 
+
+
+
+ When the user presses Enter or clicks the send icon, the entered prompt should be processed through the pipeline, and the response should be displayed in the chat interface. This interaction should mimic ChatGPT’s conversational style, using a minimal and structured layout. Each new prompt-response pair must appear at the top of the chat, pushing previous messages downward. The chat container must be scrollable. Latest prompt should be at the top of the screen and previous chat would be shifted above the screeen.
+
+
+
+ For each response, display two evaluation buttons labeled "Relevance" and "Faithfulness", showing placeholder values (e.g., True or False): 
+
+
+
+ If the value is True, use a light green background for button. 
+
+
+
+ If the value is False, use a light red background for button. 
+
+
+
+ On click, each button should trigger a pop-up dropdown that briefly displays the explanation. 
+
+
+
+ The chat history must be persisted across interactions and should only reset when a new URL is entered. 
+
+
+
+ After a successful scraping, cache the scraped article content and reuse it until a new URL is pasted. Avoid re-scraping on every call. Include a log statement that explicitly confirms: 
+
+ "Scraped content is being cached and reused until a new URL is entered." 
+
+
+
+ The chatbot module must operate independently of the article summary module. The chatbot should not require the summary to be available to function. 
+
+
+
+ Human messages should be slightly right-aligned, while model responses should be slightly left-aligned to improve visual distinction. 
+
+
+
+ Completely remove all comments from the final code. 
+
+
+
+ Please avoid redundancy and utilize existing code from existing codebase files for better modular approach. 
+
+
+
+ Implement logging for all key steps, replicating the behavior from pipeline.py. Ensure all important logs and state transitions printed or logged in pipeline.py are fully mirrored in this implementation. 
+
+
+
+ Use only gpt-4.1-nano as the model for all chatbot responses—no substitutions. 
+
+
+
+ System should Include logging for crucial steps and must do all logging/printing that are in pipeline.py. 
+
+
+
+ Chatbot interaction should not be dependent of the complete summary of the article, rather that's a separate module. 
+
+
+
+ After each successful scraping, cache the scraped data of the article until a new URL is pasted instead of scraping for each call. 
+
+
+
+ You may use Bootstrap, Tailwind CSS, or React.js for enhancing the interface. Use lightweight packages to ensure high performance, seamless interaction, and elegant design.

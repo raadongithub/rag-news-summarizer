@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 
 from scraper import NewsArticleScraper
-from retriever import ContextRetriever 
-from summary import SummaryGenerator, SelfCritique
+from retriever import ContextRetriever
+from summary import SummaryGenerator, SelfCritique, ArticleSummarizer
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -34,6 +34,22 @@ def run_pipeline(url: str, query: str):
         logging.error(f" Pipeline crashed:Encountered an Error: {e}")
         return
 
+    # Generate and print the full article summary first
+    try:
+        logging.info("Generating full article summary...")
+        full_summary_generator = ArticleSummarizer()
+        full_summary = full_summary_generator.generate(scraped_article.content)
+        
+        full_summary_output = {"full_article_summary": full_summary}
+        
+        logging.info("Full article summary generation complete.")
+        print("\n--- Full Article Summary ---")
+        print(json.dumps(full_summary_output, indent=2, ensure_ascii=False))
+        print("------------------------------\n")
+
+    except Exception as e:
+        logging.warning(f"Could not generate full article summary. Error: {e}")
+
 
     # Retreiving passage
     try:
@@ -44,11 +60,11 @@ def run_pipeline(url: str, query: str):
 
         if not retrieved_passages:
             logging.warning("No relevant passages were found for the query.")
-            print("\n--- Final Output ---\nCould not generate a summary no relevant text was found.\n")
+            print("\n--- Final Output ---\nCould not generate a summary as no relevant text was found.\n")
             return
             
         logging.info("Passage retrieval completed.")
-        print("\n--- Retrieved Passages for Context ---")
+        print("\n\n\n--- Retrieved Passages for Context ---")
         for i, passage in enumerate(retrieved_passages):
             print(f"{i+1}. {passage['text']} (Score: {passage['similarity_score']:.2f})")
         print("-" * 40)
@@ -63,7 +79,7 @@ def run_pipeline(url: str, query: str):
         summary_generator = SummaryGenerator()
         generated_summary = summary_generator.generate(query, retrieved_passages)
         logging.info("Summary generation complete.")
-        print(f"\n--- Generated Summary ---\n{generated_summary}\n" + "-" * 27)
+        print(f"\n\n\n--- Generated Summary ---\n{generated_summary}\n" + "-" * 27)
 
     except Exception as e:
         logging.error(f"Pipeline stopped: Failed to generate summary. Error: {e}")
@@ -91,7 +107,7 @@ def run_pipeline(url: str, query: str):
         "self_critique": critique_output.model_dump(),  
         "metadata": {"source_url": url,"user_query": query}}
 
-    print("\n--- Final Output---")
+    print("\n\n\n--- Final Output---")
     print(json.dumps(final_output, indent=2, ensure_ascii=False))
     print("----------------------------------\n")
 
