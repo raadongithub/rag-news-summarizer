@@ -34,6 +34,7 @@ def run_pipeline(url: str, query: str):
         logging.error(f" Pipeline crashed:Encountered an Error: {e}")
         return
 
+    '''
     # Generate and print the full article summary first
     try:
         logging.info("Generating full article summary...")
@@ -48,7 +49,7 @@ def run_pipeline(url: str, query: str):
         print("------------------------------\n")
 
     except Exception as e:
-        logging.warning(f"Could not generate full article summary. Error: {e}")
+        logging.warning(f"Could not generate full article summary. Error: {e}")'''
 
 
     # Retreiving passage
@@ -111,19 +112,47 @@ def run_pipeline(url: str, query: str):
     print(json.dumps(final_output, indent=2, ensure_ascii=False))
     print("----------------------------------\n")
 
+    
 
 def main():
     """
-    Test function
+    An interactive CLI to run the news summarization pipeline.
     """
-    
-    article_url = "https://www.dawn.com/news/1925419/pak-india-cricket-veteran-match-cancelled-after-indian-players-pull-out-of-game"
-    user_query = "Where the tournament is being held?"
+    while True:
+        # Prompt user for the initial URL
+        article_url = input("Please enter the news URL (or type 'exit' to quit): ").strip()
 
-    try:
-        run_pipeline(article_url, user_query)
-    except Exception as e:
-        logging.critical(f"A critical error occurred in  pipeline execution: {e}")
+        if article_url.lower() == 'exit':
+            print("Exiting the program...")
+            break
+
+        if not article_url:
+            print("URL cannot be empty")
+            continue
+
+        print(f"\nURL set to: {article_url}\n")
+
+        # Loop for asking questions about the current URL
+        while True:
+            user_query = input("Ask question about article (type 'new' for new URL, 'exit' to quit): ").strip()
+
+            if user_query.lower() == 'exit':
+                print("\n\nExiting the program.")
+                return  
+
+            if user_query.lower() == 'new':
+                print("\nOverwriting URL...")
+                break  # Break the inner loop 
+
+            if not user_query:
+                print("Query cannot be empty. Please ask a question.")
+                continue
+
+            try:
+                # Execute the pipeline 
+                run_pipeline(article_url, user_query)
+            except Exception as e:
+                logging.critical(f"A critical error occurred in the pipeline execution: {e}")
 
 if __name__ == "__main__":
     main()

@@ -8,7 +8,7 @@ This project is a sophisticated tool designed to scrape news articles from URL, 
 * Context retrieval
 * AI-powered summarization with self-critique
 
-The application runs as an interactive **Streamlit** web app and supports both **Docker-based deployment** and **local setup**.
+The application runs as an interactive **Streamlit** web app and supports both **Docker-based deployment**, **local setup**, and **CLI-based testing**.
 
 ---
 
@@ -43,7 +43,7 @@ graph TD;
 
 ## ⚙️ Setup Instructions
 
-This guide walks you through running the app either using Docker or locally.
+This guide walks you through running the app either using Docker, locally, or via CLI.
 
 ### 🔑 Step 1: Add Your OpenAI API Key
 
@@ -108,5 +108,58 @@ This guide walks you through running the app either using Docker or locally.
 
 5. **Access the app**
    Your browser should open automatically. If not, go to the URL displayed in the terminal (typically [http://localhost:8501](http://localhost:8501)).
+
+---
+
+### 🖥️ Option 3: CLI-Based Testing
+
+1. **Clone the repository**
+   First, clone the GitHub repo:
+
+   ```bash
+   git clone https://github.com/raadongithub/Stixor-Summarizer.git
+   cd Stixor-Summarizer
+   ```
+
+2. **Install dependencies**
+   Ensure you have Python installed. Then run:
+
+   ```bash
+   pip install uv
+   uv pip install -r pyproject.toml
+   ```
+
+3. **Download NLTK data (one-time setup)**
+
+   ```bash
+   python -m nltk.downloader punkt
+   ```
+
+4. **Run the CLI interface**
+
+   ```bash
+   python pipeline.py
+   ```
+
+5. **Using the CLI**
+   - Enter a news article URL when prompted
+   - Ask questions about the article content
+   - Type `new` to switch to a different URL
+   - Type `exit` to quit the program
+
+   **Example CLI interaction:**
+   ```
+   Please enter the news article URL (or type 'exit' to quit): https://example.com/news-article
+   URL set to: https://example.com/news-article
+
+   Ask a question about the article (type 'new' for a new URL, 'exit' to quit): What is the main topic?
+   [Pipeline executes and shows results]
+
+   Ask a question about the article (type 'new' for a new URL, 'exit' to quit): new
+   Overwriting URL...
+
+   Please enter the news article URL (or type 'exit' to quit): exit
+   Exiting the program. Goodbye!
+   ```
 
 ---

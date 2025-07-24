@@ -19,7 +19,7 @@ class ContextRetriever:
 
     # Dividing content to smaller chunks
     def split_to_chunks(
-        self, content: str, chunk_size: int=50, chunk_overlap: int=10
+        self, content: str, chunk_size: int=5, chunk_overlap: int=3
     ) -> List[str]:
         if chunk_overlap >= chunk_size:
             raise ValueError("chunk_overlap must be smaller than chunk_size.")
@@ -39,6 +39,7 @@ class ContextRetriever:
                 chunks.append(chunk)
         return chunks
 
+    # Retrieves 3 sentences for each passage
     def retrieve(self,scraped_data:Dict, query:str, k:int=3, chunk_size:int=3, chunk_overlap: int = 1,) -> Dict:
        
         content = scraped_data.get("content", "")
