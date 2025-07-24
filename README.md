@@ -78,7 +78,15 @@ This guide walks you through running the app either using Docker or locally.
 
 ### 💻 Option 2: Run Locally Without Docker
 
-1. **Install dependencies**
+1. **Clone the repository**
+   First, clone the GitHub repo:
+
+   ```bash
+   git clone https://github.com/raadongithub/Stixor-Summarizer.git
+   cd Stixor-Summarizer
+   ```
+
+2. **Install dependencies**
    Ensure you have Python installed. Then run:
 
    ```bash
@@ -86,19 +94,19 @@ This guide walks you through running the app either using Docker or locally.
    uv pip install -r pyproject.toml
    ```
 
-2. **Download NLTK data (one-time setup)**
+3. **Download NLTK data (one-time setup)**
 
    ```bash
    python -m nltk.downloader punkt
    ```
 
-3. **Run the Streamlit app**
+4. **Run the Streamlit app**
 
    ```bash
    streamlit run app.py
    ```
 
-4. **Access the app**
+5. **Access the app**
    Your browser should open automatically. If not, go to the URL displayed in the terminal (typically [http://localhost:8501](http://localhost:8501)).
 
 ---
