@@ -1,18 +1,20 @@
 [project]
-name = "stixor-task"
+name = "rag-news-summarizer"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "anthropic>=0.57.1",
     "beautifulsoup4>=4.13.4",
     "instructor>=1.10.0",
     "langchain>=0.3.26",
+    "langchain-anthropic>=0.3.17",
     "langchain-core>=0.3.70",
-    "langchain-openai>=0.3.28",
+    "langchain-voyageai>=0.1.4",
     "lxml>=6.0.0",
     "lxml-html-clean>=0.4.2",
-    "newspaper3k>=0.2.8",
+    "newspaper4k>=0.9.3.1",
     "nltk>=3.9.1",
     "numpy>=2.3.1",
     "pip>=25.1.1",
@@ -22,4 +24,5 @@ dependencies = [
     "requests>=2.32.4",
     "scikit-learn>=1.7.1",
     "streamlit>=1.47.0",
+    "voyageai>=0.3.5",
 ]

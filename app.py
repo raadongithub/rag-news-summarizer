@@ -1,26 +1,60 @@
-import streamlit as st
+import json
 import logging
 import os
-import json
+from pathlib import Path
+
+import streamlit as st
 from dotenv import load_dotenv
 
-from scraper import NewsArticleScraper
-from retriever import ContextRetriever
-from summary import SummaryGenerator, SelfCritique, ArticleSummarizer
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+PROJECT_ROOT = Path(__file__).resolve().parent
+load_dotenv(PROJECT_ROOT / ".env")
 
-load_dotenv()
+from ai.retriever import ContextRetriever
+from ai.scraper import NewsArticleScraper
+from ai.summary import ArticleSummarizer, SelfCritique, SummaryGenerator
 
-openai_api_key = os.getenv("OPENAI_API_KEY")
-if not openai_api_key:
+
+def get_secret(name: str) -> str | None:
+    """Read a key from environment variables or Streamlit secrets.
+
+    Parameters
+    ----------
+    name:
+        Secret or environment variable name.
+
+    Returns
+    -------
+    str or None
+        Secret value when found, otherwise ``None``.
+    """
+    value = os.getenv(name)
+    if value:
+        return value
+
     try:
-        openai_api_key = st.secrets["OPENAI_API_KEY"]
+        return st.secrets[name]
     except (KeyError, FileNotFoundError):
-        st.error("OPENAI_API_KEY not found. Please set it in your environment or Streamlit secrets.")
-        st.stop()
+        return None
+
+
+anthropic_api_key = get_secret("ANTHROPIC_API_KEY")
+voyage_api_key = get_secret("VOYAGE_API_KEY")
+if not anthropic_api_key:
+    st.error(
+        "ANTHROPIC_API_KEY not found. Please set it in your environment or Streamlit secrets."
+    )
+    st.stop()
 
 def inject_custom_css():
+    """Inject the custom CSS used by the Streamlit interface.
+
+    Notes
+    -----
+    This keeps the visual styling defined in one place during app startup.
+    """
     st.markdown("""
     <style>
         .stApp { background-color: #FFFFFF; }
@@ -53,6 +87,12 @@ def inject_custom_css():
     """, unsafe_allow_html=True)
 
 def initialize_session():
+    """Initialize expected Streamlit session state keys.
+
+    Notes
+    -----
+    Existing values are preserved so reruns do not reset active state.
+    """
     defaults = {
         "messages": [],
         "scraped_article": None,
@@ -65,24 +105,33 @@ def initialize_session():
             st.session_state[key] = value
 
 
-#Reset chat when new URL is pasetd
 def reset_chat_state():
+    """Reset chat-specific state when the active article URL changes."""
     st.session_state.messages = []
     st.session_state.article_summary = None
 
 def get_or_scrape_article(url: str):
-    """
-    Scrapes article from a URL or retrieves it from cache if already scraped
+    """Fetch an article from cache or scrape it on demand.
+
+    Parameters
+    ----------
+    url:
+        Article URL selected by the user.
+
+    Returns
+    -------
+    ScrapedArticle
+        Cached or newly scraped article payload.
     """
     if url in st.session_state.article_cache:
-        logging.info(f"Using cached article for URL: {url}")
+        logger.info("Using cached article for URL: %s", url)
         return st.session_state.article_cache[url]
 
-    logging.info(f"Initiated scraping for URL: {url}")
+    logger.info("Initiated scraping for URL: %s", url)
     scraper = NewsArticleScraper()
     scraped_article = scraper.scrape_article(url)
     st.session_state.article_cache[url] = scraped_article
-    logging.info("Scraping completed.")
+    logger.info("Scraping completed.")
     print(f"\n--- Scraped Article Title ---\n{scraped_article.title}\n")
     return scraped_article
 
@@ -108,7 +157,7 @@ with st.sidebar:
                     st.session_state.scraped_article = get_or_scrape_article(url_input)
                 st.rerun()
             except Exception as e:
-                logging.error(f"Pipeline crashed during scraping: {e}")
+                logger.error("Pipeline crashed during scraping: %s", e)
                 st.error(f"An error occurred while loading the article: {e}")
                 st.session_state.scraped_article = None
         else:
@@ -119,17 +168,17 @@ with st.sidebar:
         st.success(f"Article Loaded: **{st.session_state.scraped_article.title}**")
         if st.button("Generate Full Article Summary"):
             try:
-                logging.info("Generating full article summary")
+                logger.info("Generating full article summary")
                 with st.spinner("Generating summary, please wait...."):
-                    summarizer = ArticleSummarizer()
+                    summarizer = ArticleSummarizer(anthropic_api_key=anthropic_api_key)
                     summary_text = summarizer.generate(st.session_state.scraped_article.content)
                     st.session_state.article_summary = summary_text
-                    logging.info("Full article summary generation complete.")
+                    logger.info("Full article summary generation complete.")
                     print("\n\n\n--- Full Article Summary ---")
                     print(json.dumps({"full_article_summary": summary_text}, indent=2))
                     print("------------------------------\n")
             except Exception as e:
-                logging.error(f"Could not generate full article summary. Error: {e}")
+                logger.error("Could not generate full article summary. Error: %s", e)
                 st.error("Failed to generate summary.")
 
     if st.session_state.article_summary:
@@ -172,6 +221,9 @@ if prompt := st.chat_input("Ask a question about the article..."):
     if not st.session_state.scraped_article:
         st.warning("Please load an article using the sidebar first.")
         st.stop()
+    if not voyage_api_key:
+        st.warning("VOYAGE_API_KEY is required for chat retrieval features.")
+        st.stop()
 
     st.session_state.messages.append({"role": "user", "content": prompt})
 
@@ -179,33 +231,33 @@ if prompt := st.chat_input("Ask a question about the article..."):
         try:
             article_dict = json.loads(st.session_state.scraped_article.model_dump_json())
             
-            logging.info(f"Retrieving passages for query: '{prompt}'")
-            retriever = ContextRetriever(openai_api_key=openai_api_key)
+            logger.info("Retrieving passages for query: '%s'", prompt)
+            retriever = ContextRetriever(voyage_api_key=voyage_api_key)
             retrieval_results = retriever.retrieve(scraped_data=article_dict, query=prompt, k=3)
             passages = retrieval_results.get("retrieved_passages", [])
 
             if not passages:
-                logging.warning("No relevant passages were found for query.")
+                logger.warning("No relevant passages were found for query.")
                 answer = "I could not find relevant information in the article to answer your question."
                 critique_result = None
             else:
-                logging.info("Passage retrieval completed.")
+                logger.info("Passage retrieval completed.")
                 print("\n\n\n--- Retrieved Passages for Context ---")
                 for i, p in enumerate(passages):
                     print(f"{i+1}. {p['text']} (Score: {p.get('similarity_score', 'N/A'):.2f})\n\n")
                 print("-" * 40)
 
-                logging.info("Generating initial summary...")
-                summary_gen = SummaryGenerator()
+                logger.info("Generating initial summary...")
+                summary_gen = SummaryGenerator(anthropic_api_key=anthropic_api_key)
                 answer = summary_gen.generate(prompt, passages)
-                logging.info("Summary generation complete.")
+                logger.info("Summary generation complete.")
                 print(f"\n--- Generated Summary ---\n{answer}\n" + "-" * 27)
 
-                logging.info("Performing critiquw evaluation...")
-                critique_gen = SelfCritique(openai_api_key=openai_api_key)
+                logger.info("Performing critique evaluation...")
+                critique_gen = SelfCritique(anthropic_api_key=anthropic_api_key)
                 context_for_critique = "\n---\n".join([p["text"] for p in passages])
                 critique_result = critique_gen.evaluate(prompt, context_for_critique, answer)
-                logging.info("Critique evaluation complete.")
+                logger.info("Critique evaluation complete.")
             
             assistant_message = {
                 "role": "assistant",
@@ -215,7 +267,7 @@ if prompt := st.chat_input("Ask a question about the article..."):
             }
             st.session_state.messages.append(assistant_message)
             
-            logging.info("Combining results in JSON")
+            logger.info("Combining results in JSON")
             final_output = {
                 "summary": answer, 
                 "self_critique": critique_result.model_dump() if critique_result else None,  
@@ -228,5 +280,5 @@ if prompt := st.chat_input("Ask a question about the article..."):
             st.rerun()
 
         except Exception as e:
-            logging.error(f"Query processing failed due to error: {e}")
+            logger.error("Query processing failed due to error: %s", e)
             st.error(f"Failed to process your query. Error: {e}")

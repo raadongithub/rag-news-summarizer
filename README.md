@@ -45,30 +45,44 @@ graph TD;
 
 This guide walks you through running the app either using Docker, locally, or via CLI.
 
-### 🔑 Step 1: Add Your OpenAI API Key
+### 🚀 Quick Start
+
+If you want the shortest path, use Docker Compose:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Then open [http://localhost:8501](http://localhost:8501).
+
+### 🔑 Step 1: Add Your API Keys
 
 1. In the root of the project, create a file named `.env`
-2. Add your API key in the following format:
+2. Add your API keys in the following format:
 
    ```env
-   OPENAI_API_KEY="your-secret-api-key"
+   ANTHROPIC_API_KEY="your-anthropic-api-key"
+   VOYAGE_API_KEY="your-voyage-api-key"
    ```
+
+`ANTHROPIC_API_KEY` is required for article summaries and critique generation.
+`VOYAGE_API_KEY` is required for the retrieval/chat flow because Anthropic does not currently provide its own embedding model.
 
 ---
 
-### 🐳 Option 1: Run with Docker (Recommended)
+### 🐳 Option 1: Run with Docker Compose (Recommended)
 
-1. **Download the app image**
-   Open a terminal and run:
+1. **Create your env file**
 
    ```bash
-   docker pull raadondock/news_summarizer
+   cp .env.example .env
    ```
 
-2. **Run the container**
+2. **Start the app**
 
    ```bash
-   docker run -p 8501:8501 -v "$(pwd)/.env:/app/.env" raadondock/news_summarizer
+   docker compose up --build
    ```
 
 3. **Open the app**
@@ -82,8 +96,8 @@ This guide walks you through running the app either using Docker, locally, or vi
    First, clone the GitHub repo:
 
    ```bash
-   git clone https://github.com/raadongithub/Stixor-Summarizer.git
-   cd Stixor-Summarizer
+   git clone git@github.com:raadongithub/rag-news-summarizer.git
+   cd rag-news-summarizer
    ```
 
 2. **Install dependencies**
@@ -117,8 +131,8 @@ This guide walks you through running the app either using Docker, locally, or vi
    First, clone the GitHub repo:
 
    ```bash
-   git clone https://github.com/raadongithub/Stixor-Summarizer.git
-   cd Stixor-Summarizer
+   git clone git@github.com:raadongithub/rag-news-summarizer.git
+   cd rag-news-summarizer
    ```
 
 2. **Install dependencies**

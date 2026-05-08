@@ -1,0 +1,11 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: rag-news-summarizer/Dockerfile
+    container_name: rag-news-summarizer
+    env_file:
+      - .env
+    ports:
+      - "8501:8501"
+    restart: unless-stopped

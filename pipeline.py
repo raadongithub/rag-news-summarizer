@@ -1,128 +1,129 @@
-import os
 import json
 import logging
+import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 
-
-from scraper import NewsArticleScraper
-from retriever import ContextRetriever
-from summary import SummaryGenerator, SelfCritique, ArticleSummarizer
-
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-load_dotenv()
-openai_api_key = os.getenv("OPENAI_API_KEY")
-if not openai_api_key:
-    logging.error("OPENAI_API_KEY environment variable not found.")
-    raise ValueError("OPENAI_API_KEY is required.")
-
-def run_pipeline(url: str, query: str):
-    """Executes the full pipeline"""
+from ai.retriever import ContextRetriever
+from ai.scraper import NewsArticleScraper
+from ai.summary import SelfCritique, SummaryGenerator
 
 
-    # Scraping Article
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+load_dotenv(PROJECT_ROOT / ".env")
+
+anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+voyage_api_key = os.getenv("VOYAGE_API_KEY")
+if not anthropic_api_key:
+    logger.error("ANTHROPIC_API_KEY environment variable not found.")
+    raise ValueError("ANTHROPIC_API_KEY is required.")
+if not voyage_api_key:
+    logger.error("VOYAGE_API_KEY environment variable not found.")
+    raise ValueError("VOYAGE_API_KEY is required for retrieval embeddings.")
+
+
+def run_pipeline(url: str, query: str) -> None:
+    """Execute the end-to-end CLI summarization flow.
+
+    Parameters
+    ----------
+    url:
+        Article URL to scrape.
+    query:
+        User question to answer from the article.
+    """
     try:
-        logging.info(f"Initiated scraping for URL: {url}")
+        logger.info("Initiated scraping for URL: %s", url)
         scraper = NewsArticleScraper()
         scraped_article = scraper.scrape_article(url)
         scraped_data_dict = json.loads(scraped_article.model_dump_json())
-        logging.info("Scraping completed")
+        logger.info("Scraping completed")
         print(f"\n--- Scraped Article Title ---\n{scraped_article.title}\n")
-
-    except Exception as e:
-        logging.error(f" Pipeline crashed:Encountered an Error: {e}")
+    except Exception as error:
+        logger.error("Pipeline crashed during scraping: %s", error)
         return
 
-    '''
-    # Generate and print the full article summary first
     try:
-        logging.info("Generating full article summary...")
-        full_summary_generator = ArticleSummarizer()
-        full_summary = full_summary_generator.generate(scraped_article.content)
-        
-        full_summary_output = {"full_article_summary": full_summary}
-        
-        logging.info("Full article summary generation complete.")
-        print("\n--- Full Article Summary ---")
-        print(json.dumps(full_summary_output, indent=2, ensure_ascii=False))
-        print("------------------------------\n")
-
-    except Exception as e:
-        logging.warning(f"Could not generate full article summary. Error: {e}")'''
-
-
-    # Retreiving passage
-    try:
-        logging.info(f" Retreiving passages for query: '{query}'")
-        retriever = ContextRetriever (openai_api_key=openai_api_key)
-        retrieval_results = retriever.retrieve(scraped_data=scraped_data_dict, query=query, k=3)
+        logger.info("Retrieving passages for query: '%s'", query)
+        retriever = ContextRetriever(voyage_api_key=voyage_api_key)
+        retrieval_results = retriever.retrieve(
+            scraped_data=scraped_data_dict,
+            query=query,
+            k=3,
+        )
         retrieved_passages = retrieval_results.get("retrieved_passages", [])
 
         if not retrieved_passages:
-            logging.warning("No relevant passages were found for the query.")
-            print("\n--- Final Output ---\nCould not generate a summary as no relevant text was found.\n")
+            logger.warning("No relevant passages were found for the query.")
+            print(
+                "\n--- Final Output ---\nCould not generate a summary as no relevant text was found.\n"
+            )
             return
-            
-        logging.info("Passage retrieval completed.")
+
+        logger.info("Passage retrieval completed.")
         print("\n\n\n--- Retrieved Passages for Context ---")
-        for i, passage in enumerate(retrieved_passages):
-            print(f"{i+1}. {passage['text']} (Score: {passage['similarity_score']:.2f})")
+        for index, passage in enumerate(retrieved_passages, start=1):
+            print(
+                f"{index}. {passage['text']} (Score: {passage['similarity_score']:.2f})"
+            )
         print("-" * 40)
-        
-    except Exception as e:
-        logging.error(f"Pipeline stopped: Failed to retreive passages. Error: {e}")
+    except Exception as error:
+        logger.error("Pipeline stopped: failed to retrieve passages. Error: %s", error)
         return
 
-    #Generating summary
     try:
-        logging.info("Generating initial summary...")
-        summary_generator = SummaryGenerator()
+        logger.info("Generating initial summary...")
+        summary_generator = SummaryGenerator(anthropic_api_key=anthropic_api_key)
         generated_summary = summary_generator.generate(query, retrieved_passages)
-        logging.info("Summary generation complete.")
+        logger.info("Summary generation complete.")
         print(f"\n\n\n--- Generated Summary ---\n{generated_summary}\n" + "-" * 27)
-
-    except Exception as e:
-        logging.error(f"Pipeline stopped: Failed to generate summary. Error: {e}")
+    except Exception as error:
+        logger.error("Pipeline stopped: failed to generate summary. Error: %s", error)
         return
 
-    #Performing critique on generated summary
     try:
-        logging.info("Performing critique evaluation")
-        full_context = "\n---\n".join([p.get("text", "") for p in retrieved_passages])
-        critique_evaluator = SelfCritique(openai_api_key=openai_api_key)
+        logger.info("Performing critique evaluation")
+        full_context = "\n---\n".join(
+            passage.get("text", "") for passage in retrieved_passages
+        )
+        critique_evaluator = SelfCritique(anthropic_api_key=anthropic_api_key)
         critique_output = critique_evaluator.evaluate(
             query=query,
             context=full_context,
-            summary=generated_summary
+            summary=generated_summary,
         )
-        logging.info("Self-critique evaluation complete.")
-
-    except Exception as e:
-        logging.error(f"Pipeline stopped due to Error: {e}")
+        logger.info("Self-critique evaluation complete.")
+    except Exception as error:
+        logger.error("Pipeline stopped due to error: %s", error)
         return
-    
-    logging.info("Combining results in JSON")
+
+    logger.info("Combining results in JSON")
     final_output = {
-        "summary": generated_summary, 
-        "self_critique": critique_output.model_dump(),  
-        "metadata": {"source_url": url,"user_query": query}}
+        "summary": generated_summary,
+        "self_critique": critique_output.model_dump(),
+        "metadata": {"source_url": url, "user_query": query},
+    }
 
     print("\n\n\n--- Final Output---")
     print(json.dumps(final_output, indent=2, ensure_ascii=False))
     print("----------------------------------\n")
 
-    
 
-def main():
-    """
-    An interactive CLI to run the news summarization pipeline.
+def main() -> None:
+    """Run the interactive CLI for the summarization pipeline.
+
+    Notes
+    -----
+    Users can keep asking questions for the same URL, switch URLs with ``new``,
+    or exit the session with ``exit``.
     """
     while True:
-        # Prompt user for the initial URL
         article_url = input("Please enter the news URL (or type 'exit' to quit): ").strip()
-
-        if article_url.lower() == 'exit':
+        if article_url.lower() == "exit":
             print("Exiting the program...")
             break
 
@@ -132,27 +133,31 @@ def main():
 
         print(f"\nURL set to: {article_url}\n")
 
-        # Loop for asking questions about the current URL
         while True:
-            user_query = input("Ask question about article (type 'new' for new URL, 'exit' to quit): ").strip()
+            user_query = input(
+                "Ask question about article (type 'new' for new URL, 'exit' to quit): "
+            ).strip()
 
-            if user_query.lower() == 'exit':
+            if user_query.lower() == "exit":
                 print("\n\nExiting the program.")
-                return  
+                return
 
-            if user_query.lower() == 'new':
+            if user_query.lower() == "new":
                 print("\nOverwriting URL...")
-                break  # Break the inner loop 
+                break
 
             if not user_query:
                 print("Query cannot be empty. Please ask a question.")
                 continue
 
             try:
-                # Execute the pipeline 
                 run_pipeline(article_url, user_query)
-            except Exception as e:
-                logging.critical(f"A critical error occurred in the pipeline execution: {e}")
+            except Exception as error:
+                logger.critical(
+                    "A critical error occurred in the pipeline execution: %s",
+                    error,
+                )
+
 
 if __name__ == "__main__":
     main()
