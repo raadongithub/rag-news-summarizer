@@ -8,7 +8,7 @@ This project is a sophisticated tool designed to scrape news articles from URL, 
 * Context retrieval
 * AI-powered summarization with self-critique
 
-The application runs as an interactive **Streamlit** web app and supports both **Docker-based deployment**, **local setup**, and **CLI-based testing**.
+The application runs as an interactive **Streamlit** web app and supports **Docker-based deployment**, **local setup**, and **CLI-based testing**.
 
 ---
 
@@ -41,139 +41,94 @@ graph TD;
 
 ---
 
-## ⚙️ Setup Instructions
+## ⚙️ Setup
 
-This guide walks you through running the app either using Docker, locally, or via CLI.
+### Step 1: Clone the Repository
 
-### 🚀 Quick Start
+```bash
+git clone git@github.com:raadongithub/rag-news-summarizer.git
+cd rag-news-summarizer
+```
 
-If you want the shortest path, use Docker Compose:
+### Step 2: Add Your API Keys
+
+Copy the example env file and fill in your keys:
 
 ```bash
 cp .env.example .env
+```
+
+```env
+ANTHROPIC_API_KEY="your-anthropic-api-key"
+VOYAGE_API_KEY="your-voyage-api-key"
+```
+
+- `ANTHROPIC_API_KEY` — required for summarization and critique generation.
+- `VOYAGE_API_KEY` — required for the retrieval/chat flow (Anthropic does not provide its own embedding model).
+
+---
+
+### 🐳 Option 1: Docker Compose (Recommended)
+
+```bash
 docker compose up --build
 ```
 
-Then open [http://localhost:8501](http://localhost:8501).
-
-### 🔑 Step 1: Add Your API Keys
-
-1. In the root of the project, create a file named `.env`
-2. Add your API keys in the following format:
-
-   ```env
-   ANTHROPIC_API_KEY="your-anthropic-api-key"
-   VOYAGE_API_KEY="your-voyage-api-key"
-   ```
-
-`ANTHROPIC_API_KEY` is required for article summaries and critique generation.
-`VOYAGE_API_KEY` is required for the retrieval/chat flow because Anthropic does not currently provide its own embedding model.
+Open [http://localhost:8501](http://localhost:8501).
 
 ---
 
-### 🐳 Option 1: Run with Docker Compose (Recommended)
+### 💻 Option 2: Streamlit App (Local)
 
-1. **Create your env file**
+Install dependencies and download NLTK data (one-time):
 
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+uv sync
+uv run python -m nltk.downloader punkt
+```
 
-2. **Start the app**
+Run the app:
 
-   ```bash
-   docker compose up --build
-   ```
+```bash
+uv run streamlit run app.py
+```
 
-3. **Open the app**
-   Go to [http://localhost:8501](http://localhost:8501) in your browser.
-
----
-
-### 💻 Option 2: Run Locally Without Docker
-
-1. **Clone the repository**
-   First, clone the GitHub repo:
-
-   ```bash
-   git clone git@github.com:raadongithub/rag-news-summarizer.git
-   cd rag-news-summarizer
-   ```
-
-2. **Install dependencies**
-   Ensure you have Python installed. Then run:
-
-   ```bash
-   pip install uv
-   uv pip install -r pyproject.toml
-   ```
-
-3. **Download NLTK data (one-time setup)**
-
-   ```bash
-   python -m nltk.downloader punkt
-   ```
-
-4. **Run the Streamlit app**
-
-   ```bash
-   streamlit run app.py
-   ```
-
-5. **Access the app**
-   Your browser should open automatically. If not, go to the URL displayed in the terminal (typically [http://localhost:8501](http://localhost:8501)).
+Open [http://localhost:8501](http://localhost:8501).
 
 ---
 
-### 🖥️ Option 3: CLI-Based Testing
+### 🖥️ Option 3: CLI
 
-1. **Clone the repository**
-   First, clone the GitHub repo:
+Install dependencies and download NLTK data (one-time):
 
-   ```bash
-   git clone git@github.com:raadongithub/rag-news-summarizer.git
-   cd rag-news-summarizer
-   ```
+```bash
+uv sync
+uv run python -m nltk.downloader punkt
+```
 
-2. **Install dependencies**
-   Ensure you have Python installed. Then run:
+Run the CLI:
 
-   ```bash
-   pip install uv
-   uv pip install -r pyproject.toml
-   ```
+```bash
+uv run python pipeline.py
+```
 
-3. **Download NLTK data (one-time setup)**
+**Usage:**
+- Enter a news article URL when prompted
+- Ask questions about the article
+- Type `new` to switch to a different URL
+- Type `exit` to quit
 
-   ```bash
-   python -m nltk.downloader punkt
-   ```
+**Example:**
+```
+Please enter the news article URL (or type 'exit' to quit): https://example.com/news-article
+URL set to: https://example.com/news-article
 
-4. **Run the CLI interface**
+Ask a question about the article (type 'new' for a new URL, 'exit' to quit): What is the main topic?
+[Pipeline executes and shows results]
 
-   ```bash
-   python pipeline.py
-   ```
+Ask a question about the article (type 'new' for a new URL, 'exit' to quit): new
+Overwriting URL...
 
-5. **Using the CLI**
-   - Enter a news article URL when prompted
-   - Ask questions about the article content
-   - Type `new` to switch to a different URL
-   - Type `exit` to quit the program
-
-   **Example CLI interaction:**
-   ```
-   Please enter the news article URL (or type 'exit' to quit): https://example.com/news-article
-   URL set to: https://example.com/news-article
-
-   Ask a question about the article (type 'new' for a new URL, 'exit' to quit): What is the main topic?
-   [Pipeline executes and shows results]
-
-   Ask a question about the article (type 'new' for a new URL, 'exit' to quit): new
-   Overwriting URL...
-
-   Please enter the news article URL (or type 'exit' to quit): exit
-   Exiting the program. Goodbye!
-   ```
-
----
+Please enter the news article URL (or type 'exit' to quit): exit
+Exiting the program. Goodbye!
+```
