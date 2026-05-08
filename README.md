@@ -1,14 +1,78 @@
-# 📰 News Article Summarizer & Query Engine
+# News Article Summarizer
 
-## 📖 Project Overview
+RAG-powered news article summarizer and Q&A — FastAPI backend, Next.js frontend, SQLite session persistence.
 
-This project is a sophisticated tool designed to scrape news articles from URL, generate comprehensive summaries, and answer specific user questions about the article's content in a concise manner. It leverages a pipeline of:
+## Quick Start
 
-* Web scraping
-* Context retrieval
-* AI-powered summarization with self-critique
+```bash
+cp .env.example .env
+# Edit .env and add your API keys
+docker compose up --build
+```
 
-The application runs as an interactive **Streamlit** web app and supports **Docker-based deployment**, **local setup**, and **CLI-based testing**.
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- Health check: http://localhost:8000/health
+
+## Requirements
+
+| Key | Purpose |
+|-----|---------|
+| `ANTHROPIC_API_KEY` | Summarization and self-critique (Claude) |
+| `VOYAGE_API_KEY` | Embedding-based passage retrieval |
+
+## Architecture
+
+```
+frontend/   Next.js UI (React, Tailwind, TypeScript)
+backend/    FastAPI API + SQLite session persistence
+ai/         Shared AI logic: scraper, retriever, summarizer, critique
+```
+
+### API Routes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check |
+| POST | `/sessions` | Create session |
+| GET | `/sessions/{id}` | Load session |
+| POST | `/sessions/{id}/article` | Scrape article URL |
+| POST | `/sessions/{id}/summarize` | Generate full summary |
+| POST | `/sessions/{id}/chat` | Ask a question |
+| GET | `/sessions/{id}/history` | Chat history |
+
+### Session Persistence
+
+Sessions are stored in SQLite at `/data/sessions.db` inside the backend container, backed by a Docker named volume (`session_data`). Sessions survive:
+- Frontend refresh (session ID stored in `localStorage`)
+- Backend exceptions (user message and error assistant reply are saved before raising)
+- Container restart (volume persists across `docker compose down` / `up`)
+
+## Hot Reload
+
+Both services reload on code changes automatically:
+- **Backend**: `uvicorn --reload` watches `backend/` and `ai/`
+- **Frontend**: `next dev` with `WATCHPACK_POLLING=true` for Docker inotify compatibility
+
+## Old Streamlit App (legacy)
+
+The original Streamlit app still works:
+
+```bash
+pip install uv && uv sync
+uv run python -m nltk.downloader punkt punkt_tab
+uv run streamlit run app.py
+```
+
+## Known Limitations
+
+- No authentication — all sessions are public by session ID
+- SQLite is single-writer; fine for development, not production-scale
+- Passage retrieval requires a Voyage API call per question (no local embeddings)
+
+---
+
+## Original Architecture
 
 ---
 

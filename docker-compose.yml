@@ -1,11 +1,43 @@
 services:
-  app:
+  backend:
     build:
-      context: ..
-      dockerfile: rag-news-summarizer/Dockerfile
-    container_name: rag-news-summarizer
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      # Hot reload: local code changes reflected in container
+      - ./backend:/app/backend
+      - ./ai:/app/ai
+      # Persist SQLite database across restarts
+      - session_data:/data
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY}
+      - DB_PATH=/data/sessions.db
     env_file:
       - .env
-    ports:
-      - "8501:8501"
     restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      # Hot reload: bind-mount source; preserve node_modules from container
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      # Force file-system polling so inotify works inside Docker on Linux
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  session_data:
