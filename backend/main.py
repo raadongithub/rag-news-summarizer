@@ -36,9 +36,9 @@ app.add_middleware(
 def startup() -> None:
     init_db()
     if not ANTHROPIC_API_KEY:
-        logger.warning("ANTHROPIC_API_KEY is not set – summarization will fail.")
+        logger.warning("ANTHROPIC_API_KEY is not set - summarization will fail.")
     if not VOYAGE_API_KEY:
-        logger.warning("VOYAGE_API_KEY is not set – chat retrieval will fail.")
+        logger.warning("VOYAGE_API_KEY is not set - chat retrieval will fail.")
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ def chat(session_id: str, req: ChatRequest) -> dict:
     if not VOYAGE_API_KEY:
         raise HTTPException(
             status_code=503,
-            detail="VOYAGE_API_KEY is not configured – chat is unavailable",
+            detail="VOYAGE_API_KEY is not configured - chat is unavailable",
         )
 
     # Persist user message immediately so the session isn't empty on failure

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { ScrapedArticle } from "@/lib/api";
 
 interface Props {
@@ -16,8 +15,6 @@ export default function SummaryPanel({
   onGenerateSummary,
   isSummarizing,
 }: Props) {
-  const [contentExpanded, setContentExpanded] = useState(false);
-
   const publishDate = article.publish_date
     ? new Date(article.publish_date).toLocaleDateString(undefined, {
         year: "numeric",
@@ -29,7 +26,7 @@ export default function SummaryPanel({
   return (
     <div className="space-y-4">
       {/* Article metadata */}
-      <div className="card p-4 space-y-2">
+      <div className="card p-4 space-y-2 shrink-0">
         <h2 className="font-semibold text-gray-900 text-base leading-snug">
           {article.title}
         </h2>
@@ -43,9 +40,9 @@ export default function SummaryPanel({
         </div>
       </div>
 
-      {/* Full article summary */}
-      <div className="card p-4 space-y-3">
-        <div className="flex items-center justify-between">
+      {/* Article Summary — fixed height, scrollable */}
+      <div className="card p-4 flex flex-col" style={{ height: "22vh" }}>
+        <div className="flex items-center justify-between shrink-0 mb-3">
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
             Article Summary
           </h3>
@@ -60,49 +57,28 @@ export default function SummaryPanel({
           )}
         </div>
 
-        {summary ? (
-          <p className="text-sm text-gray-700 leading-relaxed">{summary}</p>
-        ) : (
-          <p className="text-sm text-gray-400 italic">
-            Click &ldquo;Generate&rdquo; to create a full article summary.
-          </p>
-        )}
+        <div className="flex-1 overflow-y-auto">
+          {summary ? (
+            <p className="text-sm text-gray-700 leading-relaxed">{summary}</p>
+          ) : (
+            <p className="text-sm text-gray-400 italic">
+              Click &ldquo;Generate&rdquo; to create a full article summary.
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* Raw article content (collapsible) */}
-      <div className="card overflow-hidden">
-        <button
-          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          onClick={() => setContentExpanded((v) => !v)}
-        >
-          <span>Full Article Text</span>
-          <ChevronIcon expanded={contentExpanded} />
-        </button>
-        {contentExpanded && (
-          <div className="px-4 pb-4 border-t border-gray-100">
-            <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap mt-3">
-              {article.content}
-            </p>
-          </div>
-        )}
+      {/* Full Article Text — fixed height, scrollable */}
+      <div className="card p-4 flex flex-col" style={{ height: "32vh" }}>
+        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide shrink-0 mb-3">
+          Full Article Text
+        </h3>
+        <div className="flex-1 overflow-y-auto">
+          <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
+            {article.content}
+          </p>
+        </div>
       </div>
     </div>
-  );
-}
-
-function ChevronIcon({ expanded }: { expanded: boolean }) {
-  return (
-    <svg
-      className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? "rotate-180" : ""}`}
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 20 20"
-      fill="currentColor"
-    >
-      <path
-        fillRule="evenodd"
-        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-        clipRule="evenodd"
-      />
-    </svg>
   );
 }

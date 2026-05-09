@@ -28,7 +28,7 @@ export default function ChatPanel({ messages, onSend, isThinking, disabled }: Pr
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4 min-h-0">
         {messages.length === 0 && (

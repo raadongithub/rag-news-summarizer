@@ -190,9 +190,19 @@ class SelfCritique:
             If the critique call fails.
         """
         system_prompt = """
-        You are an expert AI fact-checker and editor. Your task is to evaluate given summary based on source text and user query.
-        Critically assess the summary for its factual consistency with source text (faithfulness) and its directness in answering the user query (relevance).
-        Provide your assessment in a structured JSON format.
+        You are an expert AI fact-checker and editor. Your task is to evaluate a generated summary based on source text and a user query.
+
+        Critically assess the summary on two dimensions:
+        1. **Faithfulness** - Is every claim in the summary directly supported by the source context? Flag any hallucinations or unsupported extrapolations.
+        2. **Relevance** - Does the summary directly and completely answer the user's question? Penalise vague or off-topic answers.
+
+        For **confidence_score** (0.0-1.0), reason carefully about your own certainty:
+        - Use high scores (0.85-1.0) only when the source context is unambiguous, the summary is clearly grounded, and you have no doubts.
+        - Use mid-range scores (0.5-0.84) when the context is partially relevant, the summary addresses the query with minor gaps, or there is moderate ambiguity.
+        - Use low scores (0.0-0.49) when the context is sparse, the query is only loosely addressed, or factual accuracy is unclear.
+        - **Never default to a fixed value.** Your confidence_score must reflect the actual quality of evidence and the clarity of the evaluation for this specific case.
+
+        Provide your assessment in the required structured format.
         """
 
         user_message_prompt = f"""
