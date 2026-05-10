@@ -10,6 +10,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
+After both services pass their health checks, Compose prints:
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
 - Health check: http://localhost:8000/health
@@ -53,6 +54,26 @@ Sessions are stored in SQLite at `/data/sessions.db` inside the backend containe
 Both services reload on code changes automatically:
 - **Backend**: `uvicorn --reload` watches `backend/` and `ai/`
 - **Frontend**: `next dev` with `WATCHPACK_POLLING=true` for Docker inotify compatibility
+
+## RAG Evaluation
+
+RAG evaluation now uses a dedicated RAGAs pipeline that reuses the same scraper, chunking, embeddings, retrieval, and answer generation stack as the runtime app.
+
+Run it with a JSON or JSONL dataset containing:
+- `question`
+- `reference_answer`
+- `article_url` or a preloaded `article` object with `content`
+
+```bash
+uv run python evaluate_rag.py --dataset eval/samples.json --output eval/report.json
+```
+
+The report includes:
+- `context_precision`
+- `context_recall`
+- `faithfulness`
+- `answer_relevancy`
+- latency and retrieval diagnostics
 
 ## Old Streamlit App (legacy)
 
@@ -138,7 +159,7 @@ VOYAGE_API_KEY="your-voyage-api-key"
 docker compose up --build
 ```
 
-Open [http://localhost:8501](http://localhost:8501).
+Open [http://localhost:3000](http://localhost:3000).
 
 ---
 

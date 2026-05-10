@@ -5,9 +5,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from ai.retriever import ContextRetriever
+from ai.rag_pipeline import RagPipeline
 from ai.scraper import NewsArticleScraper
-from ai.summary import SelfCritique, SummaryGenerator
+from ai.summary import SelfCritique
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -48,23 +48,30 @@ def run_pipeline(url: str, query: str) -> None:
         return
 
     try:
-        logger.info("Retrieving passages for query: '%s'", query)
-        retriever = ContextRetriever(voyage_api_key=voyage_api_key)
-        retrieval_results = retriever.retrieve(
-            scraped_data=scraped_data_dict,
+        pipeline = RagPipeline(
+            voyage_api_key=voyage_api_key,
+            anthropic_api_key=anthropic_api_key,
+        )
+        pipeline_result = pipeline.answer_question(
+            article=scraped_data_dict,
             query=query,
             k=3,
         )
-        retrieved_passages = retrieval_results.get("retrieved_passages", [])
+        retrieved_passages = [
+            passage.model_dump() for passage in pipeline_result.retrieved_passages
+        ]
 
-        if not retrieved_passages:
+        if pipeline_result.used_fallback_answer:
             logger.warning("No relevant passages were found for the query.")
-            print(
-                "\n--- Final Output ---\nCould not generate a summary as no relevant text was found.\n"
-            )
+            print(f"\n--- Final Output ---\n{pipeline_result.answer}\n")
             return
 
-        logger.info("Passage retrieval completed.")
+        logger.info(
+            "Passage retrieval completed in %.1fms with %d/%d chunks returned.",
+            pipeline_result.retrieval.elapsed_ms,
+            pipeline_result.retrieval.returned_k,
+            pipeline_result.retrieval.total_chunks,
+        )
         print("\n\n\n--- Retrieved Passages for Context ---")
         for index, passage in enumerate(retrieved_passages, start=1):
             print(
@@ -76,9 +83,7 @@ def run_pipeline(url: str, query: str) -> None:
         return
 
     try:
-        logger.info("Generating initial summary...")
-        summary_generator = SummaryGenerator(anthropic_api_key=anthropic_api_key)
-        generated_summary = summary_generator.generate(query, retrieved_passages)
+        generated_summary = pipeline_result.answer
         logger.info("Summary generation complete.")
         print(f"\n\n\n--- Generated Summary ---\n{generated_summary}\n" + "-" * 27)
     except Exception as error:
@@ -105,7 +110,17 @@ def run_pipeline(url: str, query: str) -> None:
     final_output = {
         "summary": generated_summary,
         "self_critique": critique_output.model_dump(),
-        "metadata": {"source_url": url, "user_query": query},
+        "metadata": {
+            "source_url": url,
+            "user_query": query,
+            "latency_ms": {
+                "total": pipeline_result.total_elapsed_ms,
+                "retrieval": pipeline_result.retrieval.elapsed_ms,
+                "generation": pipeline_result.generation.elapsed_ms
+                if pipeline_result.generation
+                else None,
+            },
+        },
     }
 
     print("\n\n\n--- Final Output---")

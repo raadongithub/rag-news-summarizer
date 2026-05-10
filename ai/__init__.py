@@ -5,6 +5,7 @@ Notes
 Exports the core package surface used by the Streamlit app and CLI pipeline.
 """
 
+from .rag_pipeline import RagPipeline, RagPipelineResult
 from .retriever import ContextRetriever
 from .scraper import NewsArticleScraper, ScrapedArticle
 from .summary import ArticleSummarizer, Critique, SelfCritique, SummaryGenerator
@@ -14,6 +15,8 @@ __all__ = [
     "ContextRetriever",
     "Critique",
     "NewsArticleScraper",
+    "RagPipeline",
+    "RagPipelineResult",
     "ScrapedArticle",
     "SelfCritique",
     "SummaryGenerator",

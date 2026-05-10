@@ -17,6 +17,18 @@ services:
       - DB_PATH=/data/sessions.db
     env_file:
       - .env
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
     restart: unless-stopped
 
   frontend:
@@ -36,8 +48,36 @@ services:
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=true
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then((res) => { if (!res.ok) process.exit(1); }).catch(() => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
     restart: unless-stopped
+
+  startup-notifier:
+    image: python:3.12-slim
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    command:
+      [
+        "python",
+        "-c",
+        "print('News Summarizer ready\\nFrontend: http://localhost:3000\\nBackend:  http://localhost:8000\\nHealth:   http://localhost:8000/health', flush=True)",
+      ]
+    restart: "no"
 
 volumes:
   session_data:

@@ -3,14 +3,14 @@ import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .database import create_session, get_session, init_db, update_session
 
 # ai/ is on sys.path via PYTHONPATH=/app when run as `uvicorn backend.main:app`
-from ai.retriever import ContextRetriever
+from ai.rag_pipeline import RagPipeline
 from ai.scraper import NewsArticleScraper
-from ai.summary import ArticleSummarizer, SelfCritique, SummaryGenerator
+from ai.summary import ArticleSummarizer, SelfCritique
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,6 +35,7 @@ app.add_middleware(
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+    app.state.startup_complete = True
     if not ANTHROPIC_API_KEY:
         logger.warning("ANTHROPIC_API_KEY is not set - summarization will fail.")
     if not VOYAGE_API_KEY:
@@ -48,7 +49,11 @@ def startup() -> None:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "service": "backend",
+        "startup_complete": bool(getattr(app.state, "startup_complete", False)),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +135,11 @@ def summarize_article(session_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Session not found")
     if not session.get("article"):
         raise HTTPException(status_code=400, detail="No article loaded in this session")
+    if not ANTHROPIC_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="ANTHROPIC_API_KEY is not configured - summarization is unavailable",
+        )
 
     update_session(session_id, status="processing", error_message=None)
 
@@ -153,7 +163,7 @@ def summarize_article(session_id: str) -> dict:
 
 
 class ChatRequest(BaseModel):
-    question: str
+    question: str = Field(min_length=1)
 
 
 @app.post("/sessions/{session_id}/chat")
@@ -168,6 +178,11 @@ def chat(session_id: str, req: ChatRequest) -> dict:
             status_code=503,
             detail="VOYAGE_API_KEY is not configured - chat is unavailable",
         )
+    if not ANTHROPIC_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="ANTHROPIC_API_KEY is not configured - chat is unavailable",
+        )
 
     # Persist user message immediately so the session isn't empty on failure
     history: list = list(session.get("chat_history", []))
@@ -177,23 +192,32 @@ def chat(session_id: str, req: ChatRequest) -> dict:
     update_session(session_id, chat_history=history, status="processing", error_message=None)
 
     try:
-        logger.info("Retrieving passages for: %s", req.question)
-        retriever = ContextRetriever(voyage_api_key=VOYAGE_API_KEY)
-        results = retriever.retrieve(
-            scraped_data=session["article"], query=req.question, k=3
+        pipeline = RagPipeline(
+            voyage_api_key=VOYAGE_API_KEY,
+            anthropic_api_key=ANTHROPIC_API_KEY,
         )
-        passages = results.get("retrieved_passages", [])
+        pipeline_result = pipeline.answer_question(
+            article=session["article"],
+            query=req.question,
+            k=3,
+        )
+        passages = [
+            passage.model_dump() for passage in pipeline_result.retrieved_passages
+        ]
+        logger.info(
+            "RAG pipeline completed in %.1fms (retrieval %.1fms, returned %d/%d chunks)",
+            pipeline_result.total_elapsed_ms,
+            pipeline_result.retrieval.elapsed_ms,
+            pipeline_result.retrieval.returned_k,
+            pipeline_result.retrieval.total_chunks,
+        )
 
-        if not passages:
-            answer = "I could not find relevant information in the article to answer your question."
+        if pipeline_result.used_fallback_answer:
+            answer = pipeline_result.answer
             critique = None
         else:
-            logger.info("Generating answer")
-            answer = SummaryGenerator(anthropic_api_key=ANTHROPIC_API_KEY).generate(
-                req.question, passages
-            )
-
             logger.info("Running self-critique")
+            answer = pipeline_result.answer
             ctx = "\n---\n".join(p["text"] for p in passages)
             critique = SelfCritique(anthropic_api_key=ANTHROPIC_API_KEY).evaluate(
                 req.question, ctx, answer

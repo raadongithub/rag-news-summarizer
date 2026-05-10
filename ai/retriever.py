@@ -105,6 +105,10 @@ class ContextRetriever:
                     "title": scraped_data.get("title", ""),
                     "total_chunks": 0,
                     "retrieval_method": "VoyageAIEmbeddings",
+                    "chunk_size": chunk_size,
+                    "chunk_overlap": chunk_overlap,
+                    "requested_k": k,
+                    "returned_k": 0,
                 },
             }
 
@@ -118,6 +122,10 @@ class ContextRetriever:
                     "title": scraped_data.get("title", ""),
                     "total_chunks": 0,
                     "retrieval_method": "VoyageAIEmbeddings",
+                    "chunk_size": chunk_size,
+                    "chunk_overlap": chunk_overlap,
+                    "requested_k": k,
+                    "returned_k": 0,
                 },
             }
 
@@ -141,5 +149,9 @@ class ContextRetriever:
                 "title": scraped_data.get("title", ""),
                 "total_chunks": len(chunks),
                 "retrieval_method": "VoyageAIEmbeddings",
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "requested_k": k,
+                "returned_k": len(top_passages),
             },
         }

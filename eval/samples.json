@@ -1,0 +1,20 @@
+[
+  {
+    "sample_id": "demo-local-article",
+    "question": "What changed in the city's bus schedule?",
+    "reference_answer": "The city extended weekday evening bus service and added more frequent weekend routes starting next month.",
+    "article": {
+      "url": "https://example.com/city-bus-service-update",
+      "title": "City expands bus service next month",
+      "content": "The city transit agency announced a service update that will begin next month. Officials said weekday evening routes will run later than before so commuters can get home after late shifts. Weekend service will also improve, with several high-demand routes moving to a more frequent schedule. Transit leaders said the changes are funded through a mix of local budget support and state transit grants. Riders were told no fare increase is planned as part of the update.",
+      "authors": [
+        "Example Reporter"
+      ],
+      "publish_date": null,
+      "summary": "",
+      "source_domain": "example.com",
+      "word_count": 78,
+      "extraction_method": "manual"
+    }
+  }
+]

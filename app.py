@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent
 load_dotenv(PROJECT_ROOT / ".env")
 
-from ai.retriever import ContextRetriever
+from ai.rag_pipeline import RagPipeline
 from ai.scraper import NewsArticleScraper
-from ai.summary import ArticleSummarizer, SelfCritique, SummaryGenerator
+from ai.summary import ArticleSummarizer, SelfCritique
 
 
 def get_secret(name: str) -> str | None:
@@ -224,6 +224,9 @@ if prompt := st.chat_input("Ask a question about the article..."):
     if not voyage_api_key:
         st.warning("VOYAGE_API_KEY is required for chat retrieval features.")
         st.stop()
+    if not anthropic_api_key:
+        st.warning("ANTHROPIC_API_KEY is required for chat generation features.")
+        st.stop()
 
     st.session_state.messages.append({"role": "user", "content": prompt})
 
@@ -231,25 +234,36 @@ if prompt := st.chat_input("Ask a question about the article..."):
         try:
             article_dict = json.loads(st.session_state.scraped_article.model_dump_json())
             
-            logger.info("Retrieving passages for query: '%s'", prompt)
-            retriever = ContextRetriever(voyage_api_key=voyage_api_key)
-            retrieval_results = retriever.retrieve(scraped_data=article_dict, query=prompt, k=3)
-            passages = retrieval_results.get("retrieved_passages", [])
+            pipeline = RagPipeline(
+                voyage_api_key=voyage_api_key,
+                anthropic_api_key=anthropic_api_key,
+            )
+            pipeline_result = pipeline.answer_question(
+                article=article_dict,
+                query=prompt,
+                k=3,
+            )
+            passages = [
+                passage.model_dump() for passage in pipeline_result.retrieved_passages
+            ]
 
-            if not passages:
+            if pipeline_result.used_fallback_answer:
                 logger.warning("No relevant passages were found for query.")
-                answer = "I could not find relevant information in the article to answer your question."
+                answer = pipeline_result.answer
                 critique_result = None
             else:
-                logger.info("Passage retrieval completed.")
+                logger.info(
+                    "Passage retrieval completed in %.1fms with %d/%d chunks returned.",
+                    pipeline_result.retrieval.elapsed_ms,
+                    pipeline_result.retrieval.returned_k,
+                    pipeline_result.retrieval.total_chunks,
+                )
                 print("\n\n\n--- Retrieved Passages for Context ---")
                 for i, p in enumerate(passages):
                     print(f"{i+1}. {p['text']} (Score: {p.get('similarity_score', 'N/A'):.2f})\n\n")
                 print("-" * 40)
 
-                logger.info("Generating initial summary...")
-                summary_gen = SummaryGenerator(anthropic_api_key=anthropic_api_key)
-                answer = summary_gen.generate(prompt, passages)
+                answer = pipeline_result.answer
                 logger.info("Summary generation complete.")
                 print(f"\n--- Generated Summary ---\n{answer}\n" + "-" * 27)
 

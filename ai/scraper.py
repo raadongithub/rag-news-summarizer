@@ -8,8 +8,12 @@ from urllib.parse import urlparse
 import dateutil.parser
 import requests
 from bs4 import BeautifulSoup, Comment
-from newspaper import Article
 from pydantic import BaseModel, Field, HttpUrl, field_validator
+
+try:
+    from newspaper import Article
+except ImportError:  # pragma: no cover - depends on optional parser backend availability
+    Article = None
 
 
 logger = logging.getLogger(__name__)
@@ -134,6 +138,9 @@ class NewsArticleScraper:
         dict
             Raw extraction payload suitable for ``ScrapedArticle``.
         """
+        if Article is None:
+            raise RuntimeError("newspaper4k Article parser is unavailable in this environment")
+
         try:
             article = Article(url, request_timeout=self.timeout)
             article.download()
