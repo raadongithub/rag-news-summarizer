@@ -20,6 +20,16 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the evaluation runner.
+
+    Returns
+        argparse.Namespace
+            Parsed CLI arguments including dataset path and retrieval settings.
+
+    Raises
+        SystemExit
+            Raised by `argparse` when the CLI input is invalid.
+    """
     parser = argparse.ArgumentParser(
         description="Evaluate the current RAG pipeline with RAGAs metrics."
     )
@@ -54,6 +64,24 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run the evaluation CLI.
+
+    Parameters
+        None
+
+    Returns
+        None
+            Writes the evaluation report to stdout and optionally to a JSON file.
+            Successful execution exits with process code `0`.
+
+    Raises
+        ValueError
+            Raised when required environment variables or retrieval settings are invalid.
+        FileNotFoundError
+            Raised when the dataset path does not exist.
+        Exception
+            Propagates runtime errors from the evaluator, retrieval stack, or model providers.
+    """
     args = parse_args()
     anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
     voyage_api_key = os.getenv("VOYAGE_API_KEY")

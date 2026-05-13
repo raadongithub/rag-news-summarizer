@@ -41,33 +41,68 @@ def startup() -> None:
     if not VOYAGE_API_KEY:
         logger.warning("VOYAGE_API_KEY is not set - chat retrieval will fail.")
 
-
-# ---------------------------------------------------------------------------
-# Health
-# ---------------------------------------------------------------------------
-
-
 @app.get("/health")
 def health() -> dict:
+    """Return backend readiness information.
+
+    Parameters
+        None
+
+    Returns
+        dict
+            Readiness payload containing:
+            `status`
+                Always `"ok"` when the handler executes successfully.
+            `service`
+                Service identifier, currently `"backend"`.
+            `startup_complete`
+                Boolean flag indicating whether startup initialization has completed.
+
+    Raises
+        None
+            Successful responses return HTTP status code `200`.
+    """
     return {
         "status": "ok",
         "service": "backend",
         "startup_complete": bool(getattr(app.state, "startup_complete", False)),
     }
 
-
-# ---------------------------------------------------------------------------
-# Sessions
-# ---------------------------------------------------------------------------
-
-
 @app.post("/sessions", status_code=201)
 def new_session() -> dict:
+    """Create a new session record.
+
+    Parameters
+        None
+
+    Returns
+        dict
+            Newly created session payload. Successful responses return HTTP
+            status code `201`.
+
+    Raises
+        Exception
+            Propagates persistence errors from the database layer.
+    """
     return create_session()
 
 
 @app.get("/sessions/{session_id}")
 def load_session(session_id: str) -> dict:
+    """Load an existing session.
+
+    Parameters
+        session_id : str
+            Session identifier to retrieve.
+
+    Returns
+        dict
+            Session payload when found. Successful responses return HTTP status code `200`.
+
+    Raises
+        HTTPException
+            Raised with HTTP status code `404` when the session does not exist.
+    """
     session = get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -76,23 +111,57 @@ def load_session(session_id: str) -> dict:
 
 @app.get("/sessions/{session_id}/history")
 def session_history(session_id: str) -> dict:
+    """Load chat history for an existing session.
+
+    Parameters
+        session_id : str
+            Session identifier to retrieve.
+
+    Returns
+        dict
+            Object containing the `chat_history` list. Successful responses return
+            HTTP status code `200`.
+
+    Raises
+        HTTPException
+            Raised with HTTP status code `404` when the session does not exist.
+    """
     session = get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"chat_history": session.get("chat_history", [])}
 
-
-# ---------------------------------------------------------------------------
-# Article
-# ---------------------------------------------------------------------------
-
-
 class ArticleRequest(BaseModel):
+    """Request model for article loading.
+
+    Attributes
+        url : str
+            Article URL to scrape and attach to a session.
+    """
+
     url: str
 
 
 @app.post("/sessions/{session_id}/article")
 def load_article(session_id: str, req: ArticleRequest) -> dict:
+    """Scrape and attach an article to an existing session.
+
+    Parameters
+        session_id : str
+            Session identifier to update.
+        req : ArticleRequest
+            Request payload containing the target article URL.
+
+    Returns
+        dict
+            Updated session payload. Successful responses return HTTP status code `200`.
+
+    Raises
+        HTTPException
+            Raised with HTTP status code `404` when the session does not exist.
+        HTTPException
+            Raised with HTTP status code `422` when article scraping fails.
+    """
     session = get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -122,14 +191,29 @@ def load_article(session_id: str, req: ArticleRequest) -> dict:
         update_session(session_id, status="error", error_message=str(exc))
         raise HTTPException(status_code=422, detail=str(exc))
 
-
-# ---------------------------------------------------------------------------
-# Summarize
-# ---------------------------------------------------------------------------
-
-
 @app.post("/sessions/{session_id}/summarize")
 def summarize_article(session_id: str) -> dict:
+    """Generate a full-article summary for an existing session.
+
+    Parameters
+        session_id : str
+            Session identifier to summarize.
+
+    Returns
+        dict
+            Updated session payload containing the generated summary. Successful
+            responses return HTTP status code `200`.
+
+    Raises
+        HTTPException
+            Raised with HTTP status code `404` when the session does not exist.
+        HTTPException
+            Raised with HTTP status code `400` when no article has been loaded.
+        HTTPException
+            Raised with HTTP status code `503` when the Anthropic API key is missing.
+        HTTPException
+            Raised with HTTP status code `500` when summary generation fails.
+    """
     session = get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -156,18 +240,49 @@ def summarize_article(session_id: str) -> dict:
         update_session(session_id, status="error", error_message=str(exc))
         raise HTTPException(status_code=500, detail=str(exc))
 
-
-# ---------------------------------------------------------------------------
-# Chat
-# ---------------------------------------------------------------------------
-
-
 class ChatRequest(BaseModel):
+    """Request model for question answering.
+
+    Attributes
+        question : str
+            Non-empty user question asked against the loaded article.
+    """
+
     question: str = Field(min_length=1)
 
 
 @app.post("/sessions/{session_id}/chat")
 def chat(session_id: str, req: ChatRequest) -> dict:
+    """Answer a user question against the session article.
+
+    Parameters
+        session_id : str
+            Session identifier to update.
+        req : ChatRequest
+            Request payload containing the user question.
+
+    Returns
+        dict
+            Chat result payload containing:
+            `answer`
+                Generated or fallback answer text.
+            `critique`
+                Structured critique payload or `None`.
+            `passages`
+                Retrieved supporting passages.
+            Successful responses return HTTP status code `200`.
+
+    Raises
+        HTTPException
+            Raised with HTTP status code `404` when the session does not exist.
+        HTTPException
+            Raised with HTTP status code `400` when no article has been loaded.
+        HTTPException
+            Raised with HTTP status code `503` when required API keys are missing.
+        HTTPException
+            Raised with HTTP status code `500` when retrieval, generation, or
+            persistence fails after the user message is stored.
+    """
     session = get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
