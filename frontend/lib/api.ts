@@ -29,6 +29,8 @@ export interface Passage {
   text: string;
   similarity_score: number;
   rank: number;
+  metadata?: Record<string, unknown>;
+  base_similarity_score?: number | null;
 }
 
 export interface ChatMessage {

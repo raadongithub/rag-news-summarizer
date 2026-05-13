@@ -14,6 +14,7 @@ lxml-html-clean>=0.4.2
 newspaper4k>=0.9.3.1
 nltk>=3.9.1
 numpy>=2.3.1
+pymilvus>=2.5.0
 python-dateutil>=2.9.0.post0
 ragas>=0.4.3
 requests>=2.32.4
