@@ -10,7 +10,6 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 RUN python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab')"
 
 # Copy source (overridden by bind mounts in dev, but needed for build)
-COPY ai/ /app/ai/
 COPY backend/ /app/backend/
 
 ENV PYTHONPATH=/app
@@ -21,5 +20,4 @@ CMD ["uvicorn", "backend.main:app", \
      "--host", "0.0.0.0", \
      "--port", "8000", \
      "--reload", \
-     "--reload-dir", "/app/backend", \
-     "--reload-dir", "/app/ai"]
+     "--reload-dir", "/app/backend"]

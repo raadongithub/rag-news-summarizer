@@ -70,7 +70,6 @@ services:
     volumes:
       # Hot reload: local code changes reflected in container
       - ./backend:/app/backend
-      - ./ai:/app/ai
       # Persist SQLite database across restarts
       - session_data:/data
     environment:
@@ -121,7 +120,7 @@ services:
       - /app/node_modules
       - /app/.next
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
       # Force file-system polling so inotify works inside Docker on Linux
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=true

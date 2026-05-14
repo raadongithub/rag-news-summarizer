@@ -1,18 +1,27 @@
+"""SQLite-backed session persistence helpers."""
+
 import json
 import logging
-import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Optional
+
+from .core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path(os.getenv("DB_PATH", "/data/sessions.db"))
+DB_PATH = get_settings().db_path
 
 
 def _get_connection() -> sqlite3.Connection:
+    """Open a SQLite connection for session storage.
+
+    Returns
+    -------
+    sqlite3.Connection
+        Connection with row access enabled.
+    """
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
@@ -20,6 +29,7 @@ def _get_connection() -> sqlite3.Connection:
 
 
 def init_db() -> None:
+    """Create the session table when it does not exist."""
     with _get_connection() as conn:
         conn.execute(
             """
@@ -41,6 +51,18 @@ def init_db() -> None:
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict:
+    """Convert a SQLite row into the public session payload.
+
+    Parameters
+    ----------
+    row : sqlite3.Row
+        Persisted session row.
+
+    Returns
+    -------
+    dict
+        Normalized session payload.
+    """
     d = dict(row)
     d["chat_history"] = json.loads(d.pop("chat_history_json") or "[]")
     d["article"] = json.loads(d["article_json"]) if d.get("article_json") else None
@@ -55,6 +77,13 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
 
 
 def create_session() -> dict:
+    """Create a new session record.
+
+    Returns
+    -------
+    dict
+        Newly created session payload.
+    """
     session_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     with _get_connection() as conn:
@@ -67,6 +96,18 @@ def create_session() -> dict:
 
 
 def get_session(session_id: str) -> Optional[dict]:
+    """Retrieve a stored session by identifier.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier to retrieve.
+
+    Returns
+    -------
+    dict or None
+        Stored session when found, otherwise ``None``.
+    """
     with _get_connection() as conn:
         row = conn.execute(
             "SELECT * FROM sessions WHERE id = ?", (session_id,)
@@ -77,6 +118,20 @@ def get_session(session_id: str) -> Optional[dict]:
 
 
 def update_session(session_id: str, **fields: Any) -> Optional[dict]:
+    """Update a stored session and return the latest payload.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier to update.
+    **fields : Any
+        Fields to persist on the session record.
+
+    Returns
+    -------
+    dict or None
+        Updated session when found, otherwise ``None``.
+    """
     if not fields:
         return get_session(session_id)
 

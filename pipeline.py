@@ -1,27 +1,24 @@
+"""CLI entrypoint for the article question-answering pipeline."""
+
+from __future__ import annotations
+
 import json
 import logging
-import os
-from pathlib import Path
 
-from dotenv import load_dotenv
-
-from ai.rag_pipeline import RagPipeline
-from ai.scraper import NewsArticleScraper
-from ai.summary import SelfCritique
-
+from backend.core.config import get_settings
+from backend.services import ArticleService, ChatService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-load_dotenv(PROJECT_ROOT / ".env")
+SETTINGS = get_settings()
+ARTICLE_SERVICE = ArticleService(SETTINGS)
+CHAT_SERVICE = ChatService(SETTINGS)
 
-anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
-voyage_api_key = os.getenv("VOYAGE_API_KEY")
-if not anthropic_api_key:
+if not SETTINGS.anthropic_api_key:
     logger.error("ANTHROPIC_API_KEY environment variable not found.")
     raise ValueError("ANTHROPIC_API_KEY is required.")
-if not voyage_api_key:
+if not SETTINGS.voyage_api_key:
     logger.error("VOYAGE_API_KEY environment variable not found.")
     raise ValueError("VOYAGE_API_KEY is required for retrieval embeddings.")
 
@@ -31,15 +28,14 @@ def run_pipeline(url: str, query: str) -> None:
 
     Parameters
     ----------
-    url:
+    url : str
         Article URL to scrape.
-    query:
+    query : str
         User question to answer from the article.
     """
     try:
         logger.info("Initiated scraping for URL: %s", url)
-        scraper = NewsArticleScraper()
-        scraped_article = scraper.scrape_article(url)
+        scraped_article = ARTICLE_SERVICE.scrape_article(url)
         scraped_data_dict = json.loads(scraped_article.model_dump_json())
         logger.info("Scraping completed")
         print(f"\n--- Scraped Article Title ---\n{scraped_article.title}\n")
@@ -48,14 +44,13 @@ def run_pipeline(url: str, query: str) -> None:
         return
 
     try:
-        pipeline = RagPipeline(
-            voyage_api_key=voyage_api_key,
-            anthropic_api_key=anthropic_api_key,
-        )
+        pipeline = CHAT_SERVICE.create_pipeline()
         pipeline_result = pipeline.answer_question(
             article=scraped_data_dict,
             query=query,
-            k=3,
+            k=SETTINGS.default_top_k,
+            chunk_size=SETTINGS.default_chunk_size,
+            chunk_overlap=SETTINGS.default_chunk_overlap,
         )
         retrieved_passages = [
             passage.model_dump() for passage in pipeline_result.retrieved_passages
@@ -95,8 +90,7 @@ def run_pipeline(url: str, query: str) -> None:
         full_context = "\n---\n".join(
             passage.get("text", "") for passage in retrieved_passages
         )
-        critique_evaluator = SelfCritique(anthropic_api_key=anthropic_api_key)
-        critique_output = critique_evaluator.evaluate(
+        critique_output = CHAT_SERVICE.evaluate_answer(
             query=query,
             context=full_context,
             summary=generated_summary,
@@ -129,13 +123,7 @@ def run_pipeline(url: str, query: str) -> None:
 
 
 def main() -> None:
-    """Run the interactive CLI for the summarization pipeline.
-
-    Notes
-    -----
-    Users can keep asking questions for the same URL, switch URLs with ``new``,
-    or exit the session with ``exit``.
-    """
+    """Run the interactive CLI for the summarization pipeline."""
     while True:
         article_url = input("Please enter the news URL (or type 'exit' to quit): ").strip()
         if article_url.lower() == "exit":

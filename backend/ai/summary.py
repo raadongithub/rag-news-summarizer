@@ -1,15 +1,17 @@
+"""LLM-backed summarization and critique helpers."""
+
 from typing import Dict, List
 
-from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
+from ..core.config import get_settings
 
-load_dotenv()
-DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
+SETTINGS = get_settings()
+DEFAULT_ANTHROPIC_MODEL = SETTINGS.anthropic_model
 
 
 class Critique(BaseModel):
@@ -48,7 +50,7 @@ class SummaryGenerator:
     def __init__(self, anthropic_api_key: str | None = None):
         self.llm = ChatAnthropic(
             model=DEFAULT_ANTHROPIC_MODEL,
-            temperature=0.0,
+            temperature=SETTINGS.answer_temperature,
             api_key=anthropic_api_key,
         )
         self.prompt_template = ChatPromptTemplate.from_messages(
@@ -112,7 +114,7 @@ class ArticleSummarizer:
     def __init__(self, anthropic_api_key: str | None = None):
         self.llm = ChatAnthropic(
             model=DEFAULT_ANTHROPIC_MODEL,
-            temperature=0.7,
+            temperature=SETTINGS.article_summary_temperature,
             api_key=anthropic_api_key,
         )
         self.prompt_template = ChatPromptTemplate.from_messages(
@@ -163,7 +165,7 @@ class SelfCritique:
     def __init__(self, anthropic_api_key: str | None = None):
         self.llm = ChatAnthropic(
             model=DEFAULT_ANTHROPIC_MODEL,
-            temperature=0.0,
+            temperature=SETTINGS.critique_temperature,
             api_key=anthropic_api_key,
         ).with_structured_output(Critique)
 
