@@ -1,0 +1,71 @@
+# =============================================================================
+# .dockerignore — keeps the build context lean and prevents secrets/caches
+# from being sent to the Docker daemon.
+# =============================================================================
+
+# ── Git & IDE ─────────────────────────────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+.github
+.codex
+.agents
+.ruff_cache
+.vscode
+.idea
+*.swp
+*.swo
+
+# ── Secrets (NEVER send to daemon) ────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Python runtime artefacts ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+wheels/
+
+# ── Virtual environments (local uv/venv) ──────────────────────────────────────
+.venv/
+venv/
+env/
+.python-version
+
+# ── Local NLTK downloads (rebuilt cleanly inside builder stage) ───────────────
+nltk_data/
+~/nltk_data/
+
+# ── Local dev databases & data ────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# ── Frontend (has its own build context in docker-compose) ────────────────────
+frontend/
+frontend/.next/
+frontend/node_modules/
+
+# ── Evaluation scripts / notebooks (not needed in runtime image) ──────────────
+eval/
+*.ipynb
+
+# ── Documentation / reports ───────────────────────────────────────────────────
+*.pdf
+*.md
+README*
+Report*
+
+# ── Misc OS / editor noise ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
+*.tmp

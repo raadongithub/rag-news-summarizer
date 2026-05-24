@@ -1,263 +1,391 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { api, type Session } from "@/lib/api";
-import { getStoredSessionId, storeSessionId, clearStoredSessionId } from "@/lib/session";
+import { useEffect, useState } from "react";
+
 import ArticleLoader from "@/components/ArticleLoader";
-import SummaryPanel from "@/components/SummaryPanel";
+import AuthPanel from "@/components/AuthPanel";
 import ChatPanel from "@/components/ChatPanel";
+import ExpandedCanvas from "@/components/ExpandedCanvas";
+import SummaryPanel from "@/components/SummaryPanel";
+import { api, ApiError, type ChatMessage, type Passage, type ScrapedArticle, type Session } from "@/lib/api";
+import {
+  clearStoredAuth,
+  clearStoredSessionId,
+  getStoredAccessToken,
+  getStoredSessionId,
+  getStoredUser,
+  storeAccessToken,
+  storeSessionId,
+  storeUser,
+  type StoredUser,
+} from "@/lib/session";
+
+interface ExpandedState {
+  article: ScrapedArticle;
+  summary: string | null;
+  contextTitle?: string;
+  contextBody?: string;
+  contextLabel?: string;
+  passages?: Passage[];
+}
 
 export default function Home() {
   const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<StoredUser | null>(null);
   const [loadingArticle, setLoadingArticle] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
   const [thinking, setThinking] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [initializing, setInitializing] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [expandedState, setExpandedState] = useState<ExpandedState | null>(null);
 
-  // Restore or create session on mount
   useEffect(() => {
-    async function init() {
-      const stored = getStoredSessionId();
-      if (stored) {
-        try {
-          const s = await api.getSession(stored);
-          setSession(s);
-          setInitializing(false);
-          return;
-        } catch {
-          // Session gone - create fresh one
-          clearStoredSessionId();
-        }
+    async function initializeApp() {
+      const token = getStoredAccessToken();
+      const storedUser = getStoredUser();
+
+      if (!token || !storedUser) {
+        setInitializing(false);
+        return;
       }
+
+      setUser(storedUser);
+
       try {
-        const s = await api.createSession();
-        storeSessionId(s.id);
-        setSession(s);
-      } catch (e) {
-        setErrorMsg("Could not connect to the backend. Is it running?");
+        const confirmedUser = await api.me();
+        storeUser(confirmedUser);
+        setUser(confirmedUser);
+        await restoreOrCreateSession();
+      } catch (error) {
+        handleUnauthorized(error, "Your session expired. Please sign in again.");
+      } finally {
+        setInitializing(false);
       }
-      setInitializing(false);
     }
-    init();
+
+    initializeApp();
   }, []);
 
-  const clearError = useCallback(() => setErrorMsg(null), []);
+  async function restoreOrCreateSession(): Promise<void> {
+    const storedSessionId = getStoredSessionId();
+    if (storedSessionId) {
+      try {
+        const existingSession = await api.getSession(storedSessionId);
+        setSession(existingSession);
+        return;
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 404)) {
+          throw error;
+        }
+        clearStoredSessionId();
+      }
+    }
 
-  // Load article
+    const newSession = await api.createSession();
+    storeSessionId(newSession.id);
+    setSession(newSession);
+  }
+
+  function resetWorkspace(message?: string) {
+    clearStoredAuth();
+    setUser(null);
+    setSession(null);
+    setExpandedState(null);
+    setErrorMessage(message || null);
+  }
+
+  function handleUnauthorized(error: unknown, fallbackMessage: string): boolean {
+    if (error instanceof ApiError && error.status === 401) {
+      resetWorkspace(fallbackMessage);
+      return true;
+    }
+    return false;
+  }
+
+  async function handleAuthSubmit(
+    mode: "login" | "register",
+    email: string,
+    password: string
+  ): Promise<void> {
+    setAuthLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const response =
+        mode === "login" ? await api.login(email, password) : await api.register(email, password);
+      storeAccessToken(response.access_token);
+      storeUser(response.user);
+      setUser(response.user);
+      await restoreOrCreateSession();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Authentication failed";
+      setErrorMessage(message);
+    } finally {
+      setAuthLoading(false);
+      setInitializing(false);
+    }
+  }
+
   async function handleLoadArticle(url: string) {
     if (!session) return;
-    clearError();
+    setErrorMessage(null);
     setLoadingArticle(true);
+
     try {
-      const updated = await api.loadArticle(session.id, url);
-      setSession(updated);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setErrorMsg(`Failed to load article: ${msg}`);
-      // Re-fetch session to preserve any prior state
+      const updatedSession = await api.loadArticle(session.id, url);
+      setSession(updatedSession);
+    } catch (error) {
+      if (handleUnauthorized(error, "Please sign in again to continue.")) return;
+      const message = error instanceof Error ? error.message : String(error);
+      setErrorMessage(`Failed to load article: ${message}`);
       try {
-        const refreshed = await api.getSession(session.id);
-        setSession(refreshed);
+        const refreshedSession = await api.getSession(session.id);
+        setSession(refreshedSession);
       } catch {
-        // ignore
+        // Preserve existing UI state when refresh fails.
       }
     } finally {
       setLoadingArticle(false);
     }
   }
 
-  // Generate full summary
   async function handleSummarize() {
     if (!session) return;
-    clearError();
+    setErrorMessage(null);
     setSummarizing(true);
+
     try {
-      const updated = await api.summarize(session.id);
-      setSession(updated);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setErrorMsg(`Summarization failed: ${msg}`);
+      const updatedSession = await api.summarize(session.id);
+      setSession(updatedSession);
+    } catch (error) {
+      if (handleUnauthorized(error, "Please sign in again to continue.")) return;
+      const message = error instanceof Error ? error.message : String(error);
+      setErrorMessage(`Summarization failed: ${message}`);
       try {
-        const refreshed = await api.getSession(session.id);
-        setSession(refreshed);
+        const refreshedSession = await api.getSession(session.id);
+        setSession(refreshedSession);
       } catch {
-        // ignore
+        // Preserve existing UI state when refresh fails.
       }
     } finally {
       setSummarizing(false);
     }
   }
 
-  // Chat
   async function handleSendQuestion(question: string) {
     if (!session) return;
-    clearError();
+    setErrorMessage(null);
 
-    // Optimistically add user message to UI
-    setSession((prev) =>
-      prev
+    setSession((previous) =>
+      previous
         ? {
-            ...prev,
+            ...previous,
             chat_history: [
-              ...prev.chat_history,
+              ...previous.chat_history,
               { role: "user", content: question, critique: null, passages: [] },
             ],
           }
-        : prev
+        : previous
     );
     setThinking(true);
 
     try {
-      const result = await api.chat(session.id, question);
-      // Re-fetch full session to sync persisted state
-      const refreshed = await api.getSession(session.id);
-      setSession(refreshed);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setErrorMsg(`Chat error: ${msg}`);
-      // Re-fetch to get the error assistant message that backend saved
+      await api.chat(session.id, question);
+      const refreshedSession = await api.getSession(session.id);
+      setSession(refreshedSession);
+    } catch (error) {
+      if (handleUnauthorized(error, "Please sign in again to continue.")) return;
+      const message = error instanceof Error ? error.message : String(error);
+      setErrorMessage(`Chat error: ${message}`);
       try {
-        const refreshed = await api.getSession(session.id);
-        setSession(refreshed);
+        const refreshedSession = await api.getSession(session.id);
+        setSession(refreshedSession);
       } catch {
-        // ignore
+        // Preserve existing UI state when refresh fails.
       }
     } finally {
       setThinking(false);
     }
   }
 
-  // New session
   async function handleNewSession() {
-    clearStoredSessionId();
-    clearError();
+    setErrorMessage(null);
     setSession(null);
-    setInitializing(true);
+    setExpandedState(null);
+
     try {
-      const s = await api.createSession();
-      storeSessionId(s.id);
-      setSession(s);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setErrorMsg(`Could not create session: ${msg}`);
-    } finally {
-      setInitializing(false);
+      const newSession = await api.createSession();
+      storeSessionId(newSession.id);
+      setSession(newSession);
+    } catch (error) {
+      if (handleUnauthorized(error, "Please sign in again to continue.")) return;
+      const message = error instanceof Error ? error.message : String(error);
+      setErrorMessage(`Could not create session: ${message}`);
     }
+  }
+
+  function handleLogout() {
+    resetWorkspace();
+    setInitializing(false);
+  }
+
+  function openArticleCanvas(article: ScrapedArticle, summary: string | null) {
+    setExpandedState({
+      article,
+      summary,
+    });
+  }
+
+  function openMessageCanvas(message: ChatMessage, index: number) {
+    if (!session?.article) return;
+
+    const contextTitle =
+      message.role === "user" ? `Prompt ${index + 1}` : `Answer ${index + 1}`;
+    const contextBody =
+      message.role === "assistant" && message.critique
+        ? `${message.content}\n\nRelevance: ${message.critique.relevance_explanation}\n\nFaithfulness: ${message.critique.faithfulness_explanation}`
+        : message.content;
+
+    setExpandedState({
+      article: session.article,
+      summary: session.summary,
+      contextTitle,
+      contextBody,
+      contextLabel: message.role === "user" ? "Question context" : "Answer context",
+      passages: message.passages,
+    });
   }
 
   const isProcessing = loadingArticle || summarizing || thinking;
 
   if (initializing) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-400 text-sm">Connecting…</div>
+      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(125,211,252,0.2),_transparent_35%),linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)]">
+        <div className="text-sm text-slate-500">Connecting...</div>
       </div>
     );
   }
 
+  if (!user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.16),_transparent_26%),radial-gradient(circle_at_bottom_right,_rgba(15,23,42,0.14),_transparent_24%),linear-gradient(180deg,_#f8fafc_0%,_#dbeafe_100%)] px-4 py-10">
+        <AuthPanel onSubmit={handleAuthSubmit} isSubmitting={authLoading} errorMessage={errorMessage} />
+      </main>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 shrink-0">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">News Summarizer</h1>
-            <p className="text-xs text-gray-500 mt-0.5">
-              RAG-powered article Q&amp;A
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {session && (
-              <span className="hidden sm:inline text-xs text-gray-400 font-mono">
-                Session: {session.id.slice(0, 8)}…
-              </span>
-            )}
-            <button
-              className="btn-secondary text-xs py-1.5 px-3"
-              onClick={handleNewSession}
-              disabled={isProcessing}
-            >
-              New Session
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Error banner */}
-      {errorMsg && (
-        <div className="bg-red-50 border-b border-red-200 px-6 py-3 shrink-0">
-          <div className="max-w-7xl mx-auto flex items-start justify-between gap-4">
-            <p className="text-sm text-red-700">{errorMsg}</p>
-            <button
-              className="text-red-400 hover:text-red-600 shrink-0"
-              onClick={clearError}
-              aria-label="Dismiss"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Status banner when processing */}
-      {session?.status === "processing" && !isProcessing && (
-        <div className="bg-blue-50 border-b border-blue-200 px-6 py-2 shrink-0">
-          <div className="max-w-7xl mx-auto text-sm text-blue-700">
-            Processing…
-          </div>
-        </div>
-      )}
-
-      {/* Main layout */}
-      <main className="flex-1 overflow-hidden max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 h-full">
-          {/* Left panel */}
-          <aside className="flex flex-col gap-5 h-full overflow-y-auto pr-1">
-            {/* Article loader */}
-            <div className="card p-5 shrink-0">
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">
-                Load Article
-              </h2>
-              <ArticleLoader
-                onLoad={handleLoadArticle}
-                isLoading={loadingArticle}
-                currentUrl={session?.url ?? null}
-              />
+    <>
+      <div className="flex h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(125,211,252,0.16),_transparent_18%),linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)]">
+        <header className="shrink-0 border-b border-white/70 bg-white/75 px-6 py-4 backdrop-blur">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+            <div>
+              <h1 className="text-lg font-semibold text-slate-950">News Summarizer</h1>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Private RAG-powered article workspace
+              </p>
             </div>
 
-            {/* Article info + summary */}
-            {session?.article && (
-              <SummaryPanel
-                article={session.article}
-                summary={session.summary}
-                onGenerateSummary={handleSummarize}
-                isSummarizing={summarizing}
-              />
-            )}
-
-            {!session?.article && !loadingArticle && (
-              <p className="text-sm text-gray-400 text-center">
-                Enter a URL above to load an article.
-              </p>
-            )}
-          </aside>
-
-          {/* Right panel — chat */}
-          <div className="card p-5 flex flex-col h-full min-h-0 overflow-hidden">
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4 shrink-0">
-              Chat with the Article
-            </h2>
-            <ChatPanel
-              messages={session?.chat_history ?? []}
-              onSend={handleSendQuestion}
-              isThinking={thinking}
-              disabled={!session?.article || loadingArticle}
-            />
+            <div className="flex items-center gap-3">
+              <div className="hidden rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs text-slate-500 sm:block">
+                {user.email}
+              </div>
+              {session && (
+                <span className="hidden font-mono text-xs text-slate-400 lg:inline">
+                  Session {session.id.slice(0, 8)}...
+                </span>
+              )}
+              <button className="btn-secondary text-xs py-2 px-3" onClick={handleNewSession} disabled={isProcessing} type="button">
+                New session
+              </button>
+              <button className="btn-ghost" onClick={handleLogout} type="button">
+                Logout
+              </button>
+            </div>
           </div>
-        </div>
-      </main>
-    </div>
+        </header>
+
+        {errorMessage && (
+          <div className="shrink-0 border-b border-rose-200 bg-rose-50/95 px-6 py-3">
+            <div className="mx-auto flex max-w-7xl items-start justify-between gap-4">
+              <p className="text-sm text-rose-700">{errorMessage}</p>
+              <button
+                className="shrink-0 text-rose-400 transition hover:text-rose-600"
+                onClick={() => setErrorMessage(null)}
+                aria-label="Dismiss error"
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
+        {session?.status === "processing" && !isProcessing && (
+          <div className="shrink-0 border-b border-sky-200 bg-sky-50/95 px-6 py-2">
+            <div className="mx-auto max-w-7xl text-sm text-sky-700">Processing...</div>
+          </div>
+        )}
+
+        <main className="mx-auto flex w-full max-w-7xl flex-1 overflow-hidden px-4 py-6 sm:px-6">
+          <div className="grid h-full w-full grid-cols-1 gap-6 lg:grid-cols-[390px_1fr]">
+            <aside className="flex h-full flex-col gap-5 overflow-y-auto pr-1">
+              <div className="card shrink-0 p-5">
+                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-700">
+                  Load Article
+                </h2>
+                <ArticleLoader
+                  onLoad={handleLoadArticle}
+                  isLoading={loadingArticle}
+                  currentUrl={session?.url ?? null}
+                />
+              </div>
+
+              {session?.article && (
+                <SummaryPanel
+                  article={session.article}
+                  summary={session.summary}
+                  onGenerateSummary={handleSummarize}
+                  onExpand={() => openArticleCanvas(session.article!, session.summary)}
+                  isSummarizing={summarizing}
+                />
+              )}
+
+              {!session?.article && !loadingArticle && (
+                <p className="px-2 text-center text-sm text-slate-400">
+                  Enter a URL above to load an article.
+                </p>
+              )}
+            </aside>
+
+            <section className="card flex min-h-0 flex-col overflow-hidden p-5">
+              <h2 className="mb-4 shrink-0 text-sm font-semibold uppercase tracking-wide text-slate-700">
+                Chat with the Article
+              </h2>
+              <ChatPanel
+                messages={session?.chat_history ?? []}
+                onSend={handleSendQuestion}
+                onExpandMessage={openMessageCanvas}
+                isThinking={thinking}
+                disabled={!session?.article || loadingArticle}
+              />
+            </section>
+          </div>
+        </main>
+      </div>
+
+      {expandedState && (
+        <ExpandedCanvas
+          article={expandedState.article}
+          summary={expandedState.summary}
+          contextTitle={expandedState.contextTitle}
+          contextBody={expandedState.contextBody}
+          contextLabel={expandedState.contextLabel}
+          passages={expandedState.passages}
+          onClose={() => setExpandedState(null)}
+        />
+      )}
+    </>
   );
 }

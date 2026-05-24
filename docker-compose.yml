@@ -1,4 +1,37 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: news-summarizer-postgres
+    environment:
+      POSTGRES_DB: news_summarizer
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    # Suppress routine startup banners, checkpoint noise, and connection spam
+    command: >
+      postgres
+        -c log_min_messages=WARNING
+        -c log_min_error_statement=ERROR
+        -c log_checkpoints=off
+        -c log_connections=off
+        -c log_disconnections=off
+        -c log_duration=off
+        -c log_line_prefix='%t [%p] '
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d news_summarizer"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    logging:
+      driver: local
+      options:
+        max-size: "5m"
+        max-file: "3"
+
   etcd:
     container_name: milvus-etcd
     image: quay.io/coreos/etcd:v3.5.18
@@ -7,7 +40,13 @@ services:
       - ETCD_AUTO_COMPACTION_RETENTION=1000
       - ETCD_QUOTA_BACKEND_BYTES=4294967296
       - ETCD_SNAPSHOT_COUNT=50000
-    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    # --log-level=warn suppresses all info-level compaction/raft/trace output
+    command: >
+      etcd
+        --advertise-client-urls=http://127.0.0.1:2379
+        --listen-client-urls=http://0.0.0.0:2379
+        --data-dir=/etcd
+        --log-level=warn
     volumes:
       - milvus_etcd:/etcd
     healthcheck:
@@ -16,14 +55,20 @@ services:
       timeout: 20s
       retries: 5
     restart: unless-stopped
+    logging:
+      driver: local
+      options:
+        max-size: "5m"
+        max-file: "3"
 
   minio:
     container_name: milvus-minio
     image: minio/minio:RELEASE.2024-05-28T17-19-04Z
     environment:
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-    command: minio server /minio_data --console-address ":9001"
+      # Use non-deprecated variable names (suppresses the ACCESS_KEY deprecation warning)
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: minio server /minio_data --console-address ":9001" --quiet
     volumes:
       - milvus_minio:/minio_data
     healthcheck:
@@ -32,19 +77,41 @@ services:
       timeout: 20s
       retries: 5
     restart: unless-stopped
+    # MinIO stdout is banners only — no operational value; errors go to stderr captured by driver
+    logging:
+      driver: local
+      options:
+        max-size: "5m"
+        max-file: "3"
 
   milvus-standalone:
     container_name: milvus-standalone
-    image: milvusdb/milvus:v2.5.8
-    command: ["milvus", "run", "standalone"]
+    image: milvusdb/milvus:v2.5.27
+    # Wrap in sh to filter C++ glog lines (I20.../WARNING: Logging before InitGoogleLogging)
+    # and Go [INFO]/[DEBUG] that bypass user.yaml log.level setting during early init.
+    # [WARN]/[ERROR]/[FATAL] and the ready banner are always passed through.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        milvus run standalone 2>&1 | grep -v \
+          -e '^I[0-9]\{8\}' \
+          -e '^WARNING: Logging before InitGoogleLogging' \
+          -e '\[INFO\]' \
+          -e '\[DEBUG\]'
     security_opt:
       - seccomp:unconfined
     environment:
       - ETCD_ENDPOINTS=etcd:2379
       - MINIO_ADDRESS=minio:9000
       - MINIO_REGION=us-east-1
+      # Suppress Go goroutine dumps on panic
+      - GOTRACEBACK=none
+      # Suppress C++ Knowhere/FAISS startup lines (0=DEBUG 1=INFO 2=WARN 3=ERROR)
+      - KNOWHERE_LOG_LEVEL=3
     volumes:
       - milvus_data:/var/lib/milvus
+      # Sets log.level: error — silences transient WARN stack traces during startup
+      - ./deploy/milvus.yaml:/milvus/configs/user.yaml:ro
     ports:
       - "19530:19530"
       - "9091:9091"
@@ -56,10 +123,16 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
       interval: 30s
-      start_period: 90s
+      start_period: 120s
       timeout: 20s
-      retries: 5
-    restart: unless-stopped
+      retries: 10
+    # on-failure prevents rapid restart loops that cause port 19530 bind conflicts
+    restart: "no"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   backend:
     build:
@@ -68,14 +141,20 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Hot reload: local code changes reflected in container
       - ./backend:/app/backend
-      # Persist SQLite database across restarts
-      - session_data:/data
+      - ./db_migrations:/app/db_migrations
+      - ./alembic.ini:/app/alembic.ini
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - VOYAGE_API_KEY=${VOYAGE_API_KEY}
-      - DB_PATH=/data/sessions.db
+      - DATABASE_URL=${DATABASE_URL}
+      - ACCESS_TOKEN_SECRET=${ACCESS_TOKEN_SECRET}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+      - AUTH_TOKEN_ISSUER=${AUTH_TOKEN_ISSUER:-news-summarizer}
+      - MIN_PASSWORD_LENGTH=${MIN_PASSWORD_LENGTH:-8}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
       - MILVUS_URI=${MILVUS_URI:-http://milvus-standalone:19530}
       - MILVUS_COLLECTION_NAME=${MILVUS_COLLECTION_NAME:-news_article_chunks}
       - MILVUS_INDEX_TYPE=${MILVUS_INDEX_TYPE:-HNSW}
@@ -92,6 +171,8 @@ services:
     env_file:
       - .env
     depends_on:
+      postgres:
+        condition: service_healthy
       milvus-standalone:
         condition: service_healthy
     healthcheck:
@@ -100,12 +181,12 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()",
+          "import socket; s = socket.create_connection(('127.0.0.1', 8000), 2); s.close()",
         ]
-      interval: 5s
+      interval: 20s
       timeout: 3s
-      retries: 20
-      start_period: 10s
+      retries: 10
+      start_period: 15s
     restart: unless-stopped
 
   frontend:
@@ -115,13 +196,11 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # Hot reload: bind-mount source; preserve node_modules from container
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-      # Force file-system polling so inotify works inside Docker on Linux
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=true
     depends_on:
@@ -133,11 +212,11 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000/api/health').then((res) => { if (!res.ok) process.exit(1); }).catch(() => process.exit(1))",
+          "const net = require('net'); const socket = net.connect(3000, '127.0.0.1'); socket.on('connect', () => { socket.end(); process.exit(0); }); socket.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 2000);",
         ]
-      interval: 5s
+      interval: 20s
       timeout: 5s
-      retries: 20
+      retries: 10
       start_period: 15s
     restart: unless-stopped
 
@@ -152,12 +231,12 @@ services:
       [
         "python",
         "-c",
-        "print('News Summarizer ready\\nFrontend: http://localhost:3000\\nBackend:  http://localhost:8000\\nHealth:   http://localhost:8000/health', flush=True)",
+        "print('News Summarizer ready\\nFrontend: http://localhost:3000\\nBackend:  http://localhost:8000\\nHealth:   http://localhost:8000/health\\nPostgres: localhost:5432', flush=True)",
       ]
     restart: "no"
 
 volumes:
-  session_data:
+  postgres_data:
   milvus_data:
   milvus_etcd:
   milvus_minio:

@@ -1,9 +1,11 @@
+alembic>=1.16.5
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
 python-dotenv==1.1.1
 pydantic==2.11.7
 anthropic>=0.57.1
 beautifulsoup4>=4.13.4
+email-validator>=2.3.0
 instructor>=1.10.0
 langchain>=0.3.26
 langchain-anthropic>=0.3.17
@@ -14,6 +16,8 @@ lxml-html-clean>=0.4.2
 newspaper4k>=0.9.3.1
 nltk>=3.9.1
 numpy>=2.3.1
+psycopg[binary]>=3.2.9
+PyJWT>=2.10.1
 pymilvus>=2.5.0
 python-dateutil>=2.9.0.post0
 ragas>=0.4.3

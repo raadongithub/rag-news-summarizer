@@ -1,85 +1,198 @@
 """Session, article, summarize, and chat endpoints."""
 
-from fastapi import APIRouter, HTTPException, Request
+from __future__ import annotations
 
-from ..schema.requests import ArticleRequest, ChatRequest
+from fastapi import APIRouter, Depends, Request
+from sqlalchemy.orm import Session
+
+from ..db import get_db_session
+from ..models import User
+from ..schema import (
+    ArticleRequest,
+    ChatAnswerResponse,
+    ChatRequest,
+    SessionHistoryResponse,
+    SessionResponse,
+)
 from ..services import SessionService
+from .dependencies import get_current_user
 
-router = APIRouter()
-session_service = SessionService()
-
-
-@router.post("/sessions", status_code=201)
-def new_session() -> dict:
-    """Create a new session."""
-    return session_service.create_session()
+router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
-@router.get("/sessions/{session_id}")
-def load_session(session_id: str) -> dict:
-    """Load an existing session by ID."""
-    try:
-        return session_service.get_session(session_id)
-    except LookupError:
-        raise HTTPException(status_code=404, detail="Session not found")
+@router.post("", response_model=SessionResponse, status_code=201)
+def new_session(
+    current_user: User = Depends(get_current_user),
+    db_session: Session = Depends(get_db_session),
+) -> dict:
+    """Create a new session.
+
+    Parameters
+    ----------
+    current_user : User
+        Authenticated user.
+    db_session : Session
+        Active SQLAlchemy session.
+
+    Returns
+    -------
+    dict
+        Serialized session payload.
+    """
+
+    return SessionService(db_session).create_session(current_user)
 
 
-@router.get("/sessions/{session_id}/history")
-def session_history(session_id: str) -> dict:
-    """Return the chat history for a session."""
-    try:
-        return session_service.get_history(session_id)
-    except LookupError:
-        raise HTTPException(status_code=404, detail="Session not found")
+@router.get("/{session_id}", response_model=SessionResponse)
+def load_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db_session: Session = Depends(get_db_session),
+) -> dict:
+    """Load an existing session by ID.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier.
+    current_user : User
+        Authenticated user.
+    db_session : Session
+        Active SQLAlchemy session.
+
+    Returns
+    -------
+    dict
+        Serialized session payload.
+    """
+
+    return SessionService(db_session).get_session(session_id, current_user)
 
 
-@router.post("/sessions/{session_id}/article")
-async def load_article(session_id: str, req: ArticleRequest, request: Request) -> dict:
-    """Scrape and index an article for a session."""
+@router.get("/{session_id}/history", response_model=SessionHistoryResponse)
+def session_history(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db_session: Session = Depends(get_db_session),
+) -> dict:
+    """Return the chat history for a session.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier.
+    current_user : User
+        Authenticated user.
+    db_session : Session
+        Active SQLAlchemy session.
+
+    Returns
+    -------
+    dict
+        Chat history payload.
+    """
+
+    return SessionService(db_session).get_history(session_id, current_user)
+
+
+@router.post("/{session_id}/article", response_model=SessionResponse)
+async def load_article(
+    session_id: str,
+    payload: ArticleRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db_session: Session = Depends(get_db_session),
+) -> dict:
+    """Scrape and index an article for a session.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier.
+    payload : ArticleRequest
+        Article load payload.
+    request : Request
+        FastAPI request object.
+    current_user : User
+        Authenticated user.
+    db_session : Session
+        Active SQLAlchemy session.
+
+    Returns
+    -------
+    dict
+        Updated session payload.
+    """
+
     runtime = getattr(request.app.state, "runtime", None)
-    try:
-        return await session_service.load_article(
-            session_id,
-            req.url,
-            context_retriever=getattr(runtime, "context_retriever", None),
-        )
-    except LookupError:
-        raise HTTPException(status_code=404, detail="Session not found")
-    except Exception as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+    return await SessionService(db_session).load_article(
+        session_id,
+        current_user,
+        str(payload.url),
+        context_retriever=getattr(runtime, "context_retriever", None),
+    )
 
 
-@router.post("/sessions/{session_id}/summarize")
-async def summarize_article(session_id: str) -> dict:
-    """Generate an article summary for a session."""
-    try:
-        return await session_service.summarize_article(session_id)
-    except LookupError:
-        raise HTTPException(status_code=404, detail="Session not found")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="No article loaded in this session")
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+@router.post("/{session_id}/summarize", response_model=SessionResponse)
+async def summarize_article(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db_session: Session = Depends(get_db_session),
+) -> dict:
+    """Generate an article summary for a session.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier.
+    current_user : User
+        Authenticated user.
+    db_session : Session
+        Active SQLAlchemy session.
+
+    Returns
+    -------
+    dict
+        Updated session payload.
+    """
+
+    return await SessionService(db_session).summarize_article(session_id, current_user)
 
 
-@router.post("/sessions/{session_id}/chat")
-async def chat(session_id: str, req: ChatRequest, request: Request) -> dict:
-    """Answer a question against the session's article."""
+@router.post("/{session_id}/chat", response_model=ChatAnswerResponse)
+async def chat(
+    session_id: str,
+    payload: ChatRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db_session: Session = Depends(get_db_session),
+) -> dict:
+    """Answer a question against the session's article.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier.
+    payload : ChatRequest
+        Chat request payload.
+    request : Request
+        FastAPI request object.
+    current_user : User
+        Authenticated user.
+    db_session : Session
+        Active SQLAlchemy session.
+
+    Returns
+    -------
+    dict
+        Answer payload.
+    """
+
     runtime = getattr(request.app.state, "runtime", None)
-    try:
-        return await session_service.answer_question(
-            session_id,
-            req.question,
-            chunk_store=getattr(runtime, "chunk_store", None),
-            embeddings=getattr(runtime, "embeddings", None),
-        )
-    except LookupError:
-        raise HTTPException(status_code=404, detail="Session not found")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="No article loaded in this session")
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+    return await SessionService(db_session).answer_question(
+        session_id,
+        current_user,
+        payload.question,
+        chunk_store=getattr(runtime, "chunk_store", None),
+        embeddings=getattr(runtime, "embeddings", None),
+    )

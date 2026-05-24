@@ -1,13 +1,54 @@
-# Python-generated files
+# ─── Python ──────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[oc]
+*.pyd
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
+.eggs/
 
 # Virtual environments
-.venv
+.venv/
+venv/
+env/
+
+# ─── Environment / secrets ───────────────────────────────────────────────────
 .env
+.env.*
+!.env.example
 
+# ─── Node / Next.js ──────────────────────────────────────────────────────────
+node_modules/
+.next/
+.nuxt/
+out/
+.cache/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
+# ─── Docker volumes (local bind mounts) ──────────────────────────────────────
+volumes/
+docker-volumes/
+
+# ─── IDE / editor ────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ─── Test / coverage ─────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.lcov
+
+# ─── uv / pip caches ─────────────────────────────────────────────────────────
+.uv/
+pip-wheel-metadata/

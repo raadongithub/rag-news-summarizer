@@ -1,219 +1,129 @@
 # News Article Summarizer
 
-RAG-powered news article summarizer and Q&A — FastAPI backend, Next.js frontend, SQLite session persistence.
+Authenticated RAG-powered news article summarizer and Q&A with a FastAPI backend, Next.js frontend, PostgreSQL persistence, SQLAlchemy ORM, and Alembic migrations.
 
 ## Quick Start
 
 ```bash
 cp .env.example .env
-# Edit .env and add your API keys
 docker compose up --build
 ```
 
-After both services pass their health checks, Compose prints:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- Health check: http://localhost:8000/health
+When the stack is healthy:
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:8000`
+- Backend health: `http://localhost:8000/health`
+- PostgreSQL: `localhost:5432`
 
-## Requirements
+## Environment Variables
 
-| Key | Purpose |
-|-----|---------|
-| `ANTHROPIC_API_KEY` | Summarization and self-critique (Claude) |
-| `VOYAGE_API_KEY` | Embedding-based passage retrieval |
+Required:
+- `ANTHROPIC_API_KEY`
+- `VOYAGE_API_KEY`
+- `ACCESS_TOKEN_SECRET`
+
+Important defaults:
+- `DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/news_summarizer`
+- `CORS_ORIGINS=http://localhost:3000`
+- `NEXT_PUBLIC_API_URL=http://localhost:8000`
 
 ## Architecture
 
-```
-frontend/   Next.js UI (React, Tailwind, TypeScript)
-backend/    FastAPI API + SQLite session persistence
-ai/         Shared AI logic: scraper, retriever, summarizer, critique
+```text
+frontend/               Next.js UI, auth flow, article/chat canvas
+backend/api/            FastAPI route modules
+backend/core/           Centralized config, security, exceptions
+backend/db/             SQLAlchemy engine/session and Alembic helpers
+backend/models/         SQLAlchemy ORM models
+backend/repositories/   Database access layer
+backend/schema/         Pydantic request and response schemas
+backend/services/       Auth, session, article, and chat services
+db_migrations/          Migration environment and versions
 ```
 
-### API Routes
+## Auth and Session Flow
+
+- `POST /auth/register` creates a user and returns a bearer token.
+- `POST /auth/login` authenticates an existing user and returns a bearer token.
+- `GET /auth/me` returns the current authenticated user.
+- Session endpoints are now user-scoped and require `Authorization: Bearer <token>`.
+- Browser state stores the auth token and current session ID in `localStorage`.
+
+## Database and Migrations
+
+The backend uses PostgreSQL via SQLAlchemy. Alembic manages schema evolution.
+
+Apply migrations manually:
+
+```bash
+uv run alembic upgrade head
+```
+
+Create a new migration after model changes:
+
+```bash
+uv run alembic revision --autogenerate -m "describe change"
+```
+
+The FastAPI app also runs `upgrade head` during startup so containers come up on the latest schema automatically.
+
+Milvus logging is intentionally reduced in Docker by mounting [deploy/milvus.yaml](/home/raad/Bandicam_8.2.0.2524/rag-news-summarizer/deploy/milvus.yaml), which sets `log.level` to `warn`.
+
+## API Routes
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | Health check |
-| POST | `/sessions` | Create session |
-| GET | `/sessions/{id}` | Load session |
-| POST | `/sessions/{id}/article` | Scrape article URL |
-| POST | `/sessions/{id}/summarize` | Generate full summary |
-| POST | `/sessions/{id}/chat` | Ask a question |
-| GET | `/sessions/{id}/history` | Chat history |
+| `GET` | `/health` | Health check |
+| `POST` | `/auth/register` | Register a new user |
+| `POST` | `/auth/login` | Log in |
+| `GET` | `/auth/me` | Current user profile |
+| `POST` | `/sessions` | Create session |
+| `GET` | `/sessions/{id}` | Load session |
+| `GET` | `/sessions/{id}/history` | Session chat history |
+| `POST` | `/sessions/{id}/article` | Scrape and index an article |
+| `POST` | `/sessions/{id}/summarize` | Generate full summary |
+| `POST` | `/sessions/{id}/chat` | Ask a question |
 
-### Session Persistence
+## Frontend Changes
 
-Sessions are stored in SQLite at `/data/sessions.db` inside the backend container, backed by a Docker named volume (`session_data`). Sessions survive:
-- Frontend refresh (session ID stored in `localStorage`)
-- Backend exceptions (user message and error assistant reply are saved before raising)
-- Container restart (volume persists across `docker compose down` / `up`)
+- Login and registration flow added.
+- Favicon added via `frontend/app/icon.svg`.
+- Summary cards and chat items can open a full-canvas detail view.
+- Expanded canvas shows:
+  - generated summary
+  - full article text
+  - context specific to the selected article card or chat message
+  - supporting passages when available
 
-## Hot Reload
+## Local Development
 
-Both services reload on code changes automatically:
-- **Backend**: `uvicorn --reload` watches `backend/` and `ai/`
-- **Frontend**: `next dev` with `WATCHPACK_POLLING=true` for Docker inotify compatibility
+Backend:
+
+```bash
+uv sync
+uv run python -m nltk.downloader punkt punkt_tab stopwords
+uv run alembic upgrade head
+uv run uvicorn backend.main:app --reload
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ## RAG Evaluation
-
-RAG evaluation now uses a dedicated RAGAs pipeline that reuses the same scraper, chunking, embeddings, retrieval, and answer generation stack as the runtime app.
-
-Run it with a JSON or JSONL dataset containing:
-- `question`
-- `reference_answer`
-- `article_url` or a preloaded `article` object with `content`
 
 ```bash
 uv run python evaluate_rag.py --dataset eval/samples.json --output eval/report.json
 ```
 
-The report includes:
-- `context_precision`
-- `context_recall`
-- `faithfulness`
-- `answer_relevancy`
-- latency and retrieval diagnostics
+The evaluation pipeline still reuses the same scraper, chunking, embeddings, retrieval, and answer generation services as the app runtime.
 
-## Old Streamlit App (legacy)
+## Notes
 
-The original Streamlit app still works:
-
-```bash
-pip install uv && uv sync
-uv run python -m nltk.downloader punkt punkt_tab
-uv run streamlit run app.py
-```
-
-## Known Limitations
-
-- No authentication — all sessions are public by session ID
-- SQLite is single-writer; fine for development, not production-scale
-- Passage retrieval requires a Voyage API call per question (no local embeddings)
-
----
-
-## Original Architecture
-
----
-
-## 🏗️ Architecture Diagram
-
-The application follows a sequential data flow, where the output of one component becomes the input for the next.
-
-```mermaid
-graph TD;
-    A[User provides URL & Query] --> B{NewsArticleScraper};
-    B --> C[Scraped Article Content];
-    C --> D{ContextRetriever};
-    D -- User Query --> E[Relevant Passages];
-    E --> F{SummaryGenerator};
-    F --> G[Generated Summary];
-    G --> H{SelfCritique};
-    H -- "Evaluates Summary" --> I[Final Output: Summary + Critique];
-
-    subgraph "Full Article Mode"
-        C --> J{ArticleSummarizer};
-        J --> K[Full Article Summary];
-    end
-
-    style B fill:#D1FAE5,stroke:#065F46
-    style D fill:#D1FAE5,stroke:#065F46
-    style F fill:#D1FAE5,stroke:#065F46
-    style H fill:#D1FAE5,stroke:#065F46
-    style J fill:#DBEAFE,stroke:#1E40AF
-```
-
----
-
-## ⚙️ Setup
-
-### Step 1: Clone the Repository
-
-```bash
-git clone git@github.com:raadongithub/rag-news-summarizer.git
-cd rag-news-summarizer
-```
-
-### Step 2: Add Your API Keys
-
-Copy the example env file and fill in your keys:
-
-```bash
-cp .env.example .env
-```
-
-```env
-ANTHROPIC_API_KEY="your-anthropic-api-key"
-VOYAGE_API_KEY="your-voyage-api-key"
-```
-
-- `ANTHROPIC_API_KEY` — required for summarization and critique generation.
-- `VOYAGE_API_KEY` — required for the retrieval/chat flow (Anthropic does not provide its own embedding model).
-
----
-
-### 🐳 Option 1: Docker Compose (Recommended)
-
-```bash
-docker compose up --build
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
----
-
-### 💻 Option 2: Streamlit App (Local)
-
-Install dependencies and download NLTK data (one-time):
-
-```bash
-uv sync
-uv run python -m nltk.downloader punkt
-```
-
-Run the app:
-
-```bash
-uv run streamlit run app.py
-```
-
-Open [http://localhost:8501](http://localhost:8501).
-
----
-
-### 🖥️ Option 3: CLI
-
-Install dependencies and download NLTK data (one-time):
-
-```bash
-uv sync
-uv run python -m nltk.downloader punkt
-```
-
-Run the CLI:
-
-```bash
-uv run python pipeline.py
-```
-
-**Usage:**
-- Enter a news article URL when prompted
-- Ask questions about the article
-- Type `new` to switch to a different URL
-- Type `exit` to quit
-
-**Example:**
-```
-Please enter the news article URL (or type 'exit' to quit): https://example.com/news-article
-URL set to: https://example.com/news-article
-
-Ask a question about the article (type 'new' for a new URL, 'exit' to quit): What is the main topic?
-[Pipeline executes and shows results]
-
-Ask a question about the article (type 'new' for a new URL, 'exit' to quit): new
-Overwriting URL...
-
-Please enter the news article URL (or type 'exit' to quit): exit
-Exiting the program. Goodbye!
-```
+- Existing article loading, summary generation, and RAG chat behavior remain intact behind the new auth and persistence layer.
+- Session records store article payloads, chat history, and retrieval metadata as ORM-managed JSON columns.
+- Structured error responses now include stable error codes for auth and validation failures.

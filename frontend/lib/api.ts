@@ -1,9 +1,6 @@
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { getStoredAccessToken, type StoredUser } from "@/lib/session";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface ScrapedArticle {
   url: string;
@@ -42,6 +39,7 @@ export interface ChatMessage {
 
 export interface Session {
   id: string;
+  user_id: string;
   url: string | null;
   article: ScrapedArticle | null;
   summary: string | null;
@@ -59,45 +57,89 @@ export interface ChatResponse {
   passages: Passage[];
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function request<T>(
-  path: string,
-  options?: RequestInit
-): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-
-  if (!res.ok) {
-    let detail = `HTTP ${res.status}`;
-    try {
-      const body = await res.json();
-      detail = body.detail || detail;
-    } catch {
-      // ignore parse errors
-    }
-    throw new Error(detail);
-  }
-
-  return res.json() as Promise<T>;
+export interface AuthResponse {
+  access_token: string;
+  token_type: "bearer";
+  user: StoredUser;
 }
 
-// ---------------------------------------------------------------------------
-// API calls
-// ---------------------------------------------------------------------------
+export class ApiError extends Error {
+  status: number;
+  errorCode: string | null;
+
+  constructor(message: string, status: number, errorCode: string | null = null) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.errorCode = errorCode;
+  }
+}
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = getStoredAccessToken();
+  const headers = new Headers(options?.headers);
+
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    let errorCode: string | null = null;
+    try {
+      const body = await response.json();
+      // Prefer the top-level detail string when it's human-readable
+      if (typeof body.detail === "string" && body.detail !== "Request validation failed") {
+        detail = body.detail;
+      } else if (Array.isArray(body.errors) && body.errors.length > 0) {
+        // Pydantic v2 validation errors — extract the first meaningful message
+        const msgs = body.errors
+          .map((entry: { msg?: string; ctx?: { error?: string } }) =>
+            entry.ctx?.error ?? entry.msg ?? ""
+          )
+          .filter(Boolean);
+        detail = msgs.length > 0 ? msgs.join("; ") : (body.detail ?? detail);
+      } else if (typeof body.detail === "string") {
+        detail = body.detail;
+      }
+      errorCode = typeof body.error_code === "string" ? body.error_code : null;
+    } catch {
+      // Ignore response parsing errors and fall back to HTTP status text.
+    }
+    throw new ApiError(detail, response.status, errorCode);
+  }
+
+  return response.json() as Promise<T>;
+}
 
 export const api = {
   health: () => request<{ status: string }>("/health"),
 
-  createSession: () =>
-    request<Session>("/sessions", { method: "POST" }),
+  register: (email: string, password: string) =>
+    request<AuthResponse>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
 
-  getSession: (sessionId: string) =>
-    request<Session>(`/sessions/${sessionId}`),
+  login: (email: string, password: string) =>
+    request<AuthResponse>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+
+  me: () => request<StoredUser>("/auth/me"),
+
+  createSession: () => request<Session>("/sessions", { method: "POST" }),
+
+  getSession: (sessionId: string) => request<Session>(`/sessions/${sessionId}`),
 
   loadArticle: (sessionId: string, url: string) =>
     request<Session>(`/sessions/${sessionId}/article`, {

@@ -1,43 +1,51 @@
-"""Centralized application configuration.
+"""Centralized application configuration."""
 
-All settings are read from environment variables (or a .env file at the project root).
-Call ``get_settings()`` anywhere in the codebase to get a shared, cached config object.
-"""
+from __future__ import annotations
 
 import json
 import os
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from dotenv import load_dotenv
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-ENV_FILE = PROJECT_ROOT / ".env"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ENV_FILE = REPO_ROOT / ".env"
 
 
 def load_environment() -> None:
-    """Load .env into the process environment (no-op if already loaded)."""
+    """Load environment variables from the repository `.env` file.
+
+    Returns
+    -------
+    None
+        This function mutates process environment variables in place.
+    """
+
     load_dotenv(ENV_FILE, override=False)
 
-
-# ---------------------------------------------------------------------------
-# Sub-configs used by the ai/ layer
-# ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class EmbeddingConfig:
     """Settings for the Voyage embedding service."""
 
     model: str = "voyage-4"
-    output_dimension: Optional[int] = None
+    output_dimension: int | None = None
     batch_size: int = 32
     truncation: bool = True
 
     @classmethod
     def from_env(cls) -> "EmbeddingConfig":
-        """Build from environment variables."""
+        """Build embedding settings from environment variables.
+
+        Returns
+        -------
+        EmbeddingConfig
+            Parsed embedding configuration.
+        """
+
         raw_dim = os.getenv("VOYAGE_EMBEDDING_DIMENSION", "").strip()
         return cls(
             model=os.getenv("VOYAGE_EMBEDDING_MODEL", "voyage-4"),
@@ -53,7 +61,7 @@ class MilvusConfig:
     """Settings for Milvus vector storage."""
 
     uri: str = "http://milvus-standalone:19530"
-    token: Optional[str] = None
+    token: str | None = None
     collection_name: str = "news_article_chunks"
     consistency_level: str = "Session"
     metric_type: str = "COSINE"
@@ -68,9 +76,15 @@ class MilvusConfig:
 
     @classmethod
     def from_env(cls) -> "MilvusConfig":
-        """Build from environment variables."""
+        """Build Milvus settings from environment variables.
 
-        def _json(name: str, default: dict) -> dict:
+        Returns
+        -------
+        MilvusConfig
+            Parsed Milvus configuration.
+        """
+
+        def _json(name: str, default: dict[str, Any]) -> dict[str, Any]:
             raw = os.getenv(name, "").strip()
             return json.loads(raw) if raw else default
 
@@ -103,7 +117,14 @@ class RetrievalConfig:
 
     @classmethod
     def from_env(cls) -> "RetrievalConfig":
-        """Build from environment variables."""
+        """Build retrieval settings from environment variables.
+
+        Returns
+        -------
+        RetrievalConfig
+            Parsed retrieval configuration.
+        """
+
         return cls(
             default_top_k=int(os.getenv("RAG_TOP_K", "3")),
             candidate_multiplier=int(os.getenv("RAG_CANDIDATE_MULTIPLIER", "4")),
@@ -120,20 +141,16 @@ class RetrievalConfig:
         )
 
 
-# ---------------------------------------------------------------------------
-# Top-level app config
-# ---------------------------------------------------------------------------
-
 @dataclass(frozen=True)
 class AppConfig:
-    """Top-level settings shared across all entrypoints (Streamlit, FastAPI)."""
+    """Top-level settings shared across the backend application."""
 
     project_root: Path
     env_file: Path
     app_name: str
     app_version: str
-    anthropic_api_key: Optional[str]
-    voyage_api_key: Optional[str]
+    anthropic_api_key: str | None
+    voyage_api_key: str | None
     anthropic_model: str
     answer_temperature: float
     article_summary_temperature: float
@@ -141,24 +158,39 @@ class AppConfig:
     default_top_k: int
     default_chunk_size: int
     default_chunk_overlap: int
-    db_path: Path
+    database_url: str
     cors_origins: tuple[str, ...]
     next_public_api_url: str
+    access_token_secret: str
+    access_token_expire_minutes: int
+    auth_token_issuer: str
+    min_password_length: int
+    frontend_url: str
+    embedding: EmbeddingConfig
+    milvus: MilvusConfig
+    retrieval: RetrievalConfig
 
     @classmethod
     def from_env(cls) -> "AppConfig":
-        """Build from environment variables (loads .env first)."""
+        """Build the application configuration from environment variables.
+
+        Returns
+        -------
+        AppConfig
+            Parsed application configuration.
+        """
+
         load_environment()
 
         raw_origins = os.getenv("CORS_ORIGINS", "").strip()
         cors_origins = (
-            tuple(o.strip() for o in raw_origins.split(",") if o.strip())
+            tuple(origin.strip() for origin in raw_origins.split(",") if origin.strip())
             if raw_origins
-            else ("*",)
+            else ("http://localhost:3000",)
         )
 
         return cls(
-            project_root=PROJECT_ROOT,
+            project_root=REPO_ROOT,
             env_file=ENV_FILE,
             app_name=os.getenv("APP_NAME", "News Summarizer API"),
             app_version=os.getenv("APP_VERSION", "1.0.0"),
@@ -171,15 +203,38 @@ class AppConfig:
             default_top_k=int(os.getenv("DEFAULT_TOP_K", "3")),
             default_chunk_size=int(os.getenv("DEFAULT_CHUNK_SIZE", "3")),
             default_chunk_overlap=int(os.getenv("DEFAULT_CHUNK_OVERLAP", "1")),
-            db_path=Path(os.getenv("DB_PATH", "/data/sessions.db")),
+            database_url=os.getenv(
+                "DATABASE_URL",
+                "postgresql+psycopg://postgres:postgres@localhost:5432/news_summarizer",
+            ),
             cors_origins=cors_origins,
             next_public_api_url=os.getenv("NEXT_PUBLIC_API_URL", "http://localhost:8000"),
+            access_token_secret=os.getenv(
+                "ACCESS_TOKEN_SECRET",
+                # Default is long enough to pass the 32-char check in dev.
+                # ALWAYS override this in production via .env or environment variable.
+                "dev-only-insecure-secret-change-this-in-production-immediately",
+            ),
+            access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440")),
+            auth_token_issuer=os.getenv("AUTH_TOKEN_ISSUER", "news-summarizer"),
+            min_password_length=int(os.getenv("MIN_PASSWORD_LENGTH", "8")),
+            frontend_url=os.getenv("FRONTEND_URL", "http://localhost:3000"),
+            embedding=EmbeddingConfig.from_env(),
+            milvus=MilvusConfig.from_env(),
+            retrieval=RetrievalConfig.from_env(),
         )
 
 
 @lru_cache(maxsize=1)
 def get_settings() -> AppConfig:
-    """Return the cached application settings (reads env once on first call)."""
+    """Return cached application settings.
+
+    Returns
+    -------
+    AppConfig
+        Singleton settings object for the current process.
+    """
+
     return AppConfig.from_env()
 
 
