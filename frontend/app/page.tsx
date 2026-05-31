@@ -16,6 +16,8 @@ import {
   getStoredAccessToken,
   getStoredSessionId,
   getStoredUser,
+  hasCompletedOnboarding,
+  markOnboardingComplete,
   storeAccessToken,
   storeSessionId,
   storeUser,
@@ -41,6 +43,9 @@ export default function Home() {
   const [initializing, setInitializing] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
   const [expandedState, setExpandedState] = useState<ExpandedState | null>(null);
+  // showOnboarding becomes true exactly once: when the user loads their first
+  // article and has never completed the onboarding tour before.
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     async function initializeApp() {
@@ -119,6 +124,9 @@ export default function Home() {
       storeAccessToken(response.access_token);
       storeUser(response.user);
       setUser(response.user);
+      if (mode === "register" && !hasCompletedOnboarding()) {
+        setShowOnboarding(true);
+      }
       await restoreOrCreateSession();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Authentication failed";
@@ -129,6 +137,23 @@ export default function Home() {
     }
   }
 
+  /**
+   * Load an article into the current session from a URL.
+   *
+   * This is a one-way operation per session: once an article is attached the
+   * Load Article form is hidden and can only be reset by starting a new
+   * session. After a successful load, the onboarding tip is triggered the
+   * first time a user loads any article.
+   *
+   * Parameters
+   * ----------
+   * url : string
+   *     The publicly accessible URL of the news article to fetch and index.
+   *
+   * Returns
+   * -------
+   * void
+   */
   async function handleLoadArticle(url: string) {
     if (!session) return;
     setErrorMessage(null);
@@ -150,6 +175,21 @@ export default function Home() {
     } finally {
       setLoadingArticle(false);
     }
+  }
+
+  /**
+   * Dismiss the onboarding callout and persist the completion flag.
+   *
+   * After this is called, hasCompletedOnboarding() returns true for all
+   * future page loads on this device, ensuring the tour is shown only once.
+   *
+   * Returns
+   * -------
+   * void
+   */
+  function handleDismissOnboarding() {
+    markOnboardingComplete();
+    setShowOnboarding(false);
   }
 
   async function handleSummarize() {
@@ -297,7 +337,7 @@ export default function Home() {
     <>
       <div className="flex h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(125,211,252,0.16),_transparent_18%),linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)]">
 
-        {/* ── Header ─────────────────────────────────────────────── */}
+        {/* Header */}
         <header className="shrink-0 border-b border-white/70 bg-white/75 backdrop-blur">
           <div className="flex h-14 items-center gap-3 px-4">
 
@@ -343,12 +383,14 @@ export default function Home() {
                     disabled={isProcessing}
                   />
                   <button
-                    className="btn-secondary py-1.5 px-3 text-xs"
+                    className="btn-secondary py-1.5 px-3 text-base font-semibold leading-none"
                     onClick={handleNewSession}
                     disabled={isProcessing}
                     type="button"
+                    aria-label="New session"
+                    title="New session"
                   >
-                    New session
+                    +
                   </button>
                 </div>
               )}
@@ -369,7 +411,7 @@ export default function Home() {
           </div>
         </header>
 
-        {/* ── Banners ─────────────────────────────────────────────── */}
+        {/* Banners */}
         {errorMessage && (
           <div className="shrink-0 border-b border-rose-200 bg-rose-50/95 px-4 py-3">
             <div className="flex items-start justify-between gap-4">
@@ -392,7 +434,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── Main three-section layout ───────────────────────────── */}
+        {/* Main layout */}
         <main className="flex flex-1 overflow-hidden">
 
           {/* Left panel – collapsible article workspace */}
@@ -402,21 +444,33 @@ export default function Home() {
             }`}
           >
             <div className="flex h-full w-80 flex-col gap-4 overflow-y-auto p-4">
-              {/* Article URL loader ─────────────────────────── */}
-              <div className="card shrink-0 p-5">
-                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-700">
-                  Load Article
-                </h2>
-                <ArticleLoader
-                  onLoad={handleLoadArticle}
-                  isLoading={loadingArticle}
-                  currentUrl={session?.url ?? null}
-                />
-              </div>
+              {/*
+               * Article URL loader — only shown before an article is attached.
+               * Once a session has an article the form is intentionally hidden:
+               * one session = one article. A new session is required to load a
+               * different article.
+               */}
+              {!session?.article && (
+                <div className="card shrink-0 p-5">
+                  <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-700">
+                    Load Article
+                  </h2>
+                  <ArticleLoader
+                    onLoad={handleLoadArticle}
+                    isLoading={loadingArticle}
+                    currentUrl={session?.url ?? null}
+                  />
+                  {!loadingArticle && (
+                    <p className="mt-4 text-center text-xs text-slate-400">
+                      Paste an article URL above to load content into this session.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {session?.article && (
                 <>
-                  {/* Summary card — grows to fill available space ── */}
+                  {/* Summary card */}
                   <div className="flex min-h-[240px] flex-col" style={{ flex: "0 0 auto" }}>
                     <SummaryPanel
                       article={session.article}
@@ -426,18 +480,7 @@ export default function Home() {
                       isSummarizing={summarizing}
                     />
                   </div>
-
-                  {/* Full article text — collapsible ──────────────── */}
-                  <div className="shrink-0">
-                    <ArticleTextPanel content={session.article.content} />
-                  </div>
                 </>
-              )}
-
-              {!session?.article && !loadingArticle && (
-                <p className="px-2 text-center text-sm text-slate-400">
-                  Paste an article URL above to load content into this session.
-                </p>
               )}
             </div>
           </div>
@@ -470,6 +513,14 @@ export default function Home() {
           contextLabel={expandedState.contextLabel}
           passages={expandedState.passages}
           onClose={() => setExpandedState(null)}
+        />
+      )}
+
+      {session?.article && (
+        <ArticleTextPanel
+          content={session.article.content}
+          showOnboardingTip={showOnboarding}
+          onDismissOnboarding={handleDismissOnboarding}
         />
       )}
     </>

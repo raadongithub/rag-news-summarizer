@@ -1,6 +1,7 @@
 const SESSION_KEY = "news_summarizer_session_id";
 const ACCESS_TOKEN_KEY = "news_summarizer_access_token";
 const USER_KEY = "news_summarizer_user";
+const ONBOARDING_KEY = "news_summarizer_onboarding_done";
 
 export interface StoredUser {
   id: string;
@@ -70,4 +71,31 @@ export function clearStoredAuth(): void {
   clearStoredAccessToken();
   clearStoredUser();
   clearStoredSessionId();
+}
+
+/**
+ * Check whether the user has already completed the onboarding tour.
+ *
+ * Returns
+ * -------
+ * boolean
+ *     True when the completion flag is present in localStorage,
+ *     false when it is absent or when localStorage is unavailable
+ *     (e.g. during server-side rendering).
+ */
+export function hasCompletedOnboarding(): boolean {
+  if (!canUseStorage()) return false;
+  return localStorage.getItem(ONBOARDING_KEY) === "1";
+}
+
+/**
+ * Persist the onboarding completion flag so the tour is never shown again.
+ *
+ * Returns
+ * -------
+ * void
+ */
+export function markOnboardingComplete(): void {
+  if (!canUseStorage()) return;
+  localStorage.setItem(ONBOARDING_KEY, "1");
 }

@@ -34,7 +34,7 @@ export default function SummaryPanel({
 
   return (
     <div className="card flex flex-col overflow-hidden">
-      {/* ── Article identity ──────────────────────────── */}
+      {/* Article identity */}
       <div className="shrink-0 border-b border-slate-100 px-5 pt-5 pb-4">
         <h2 className="text-base font-semibold leading-snug text-slate-950">
           {article.title}
@@ -52,7 +52,7 @@ export default function SummaryPanel({
         )}
       </div>
 
-      {/* ── Summary content ───────────────────────────── */}
+      {/* Summary content */}
       <div className="flex min-h-0 flex-1 flex-col px-5 pt-4 pb-3">
         <p className="mb-3 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">
           Summary
@@ -60,17 +60,13 @@ export default function SummaryPanel({
         <div className="min-h-0 flex-1 overflow-y-auto">
           {summary ? (
             <p className="text-sm leading-7 text-slate-700">{summary}</p>
-          ) : (
-            <p className="text-sm italic text-slate-400">
-              {isSummarizing
-                ? "Generating summary…"
-                : "Generate a summary to see it here."}
-            </p>
-          )}
+          ) : isSummarizing ? (
+            <p className="text-sm italic text-slate-400">Generating summary…</p>
+          ) : null}
         </div>
       </div>
 
-      {/* ── Action row ────────────────────────────────── */}
+      {/* Action row */}
       <div className="shrink-0 border-t border-slate-100 px-5 py-3 flex items-center justify-end gap-2">
         {!summary && (
           <button
@@ -89,9 +85,11 @@ export default function SummaryPanel({
             )}
           </button>
         )}
-        <button className="btn-ghost" onClick={onExpand} type="button">
-          Open canvas
-        </button>
+        {summary && (
+          <button className="btn-ghost" onClick={onExpand} type="button">
+            Open canvas
+          </button>
+        )}
       </div>
     </div>
   );
