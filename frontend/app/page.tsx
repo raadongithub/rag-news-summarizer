@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import ArticleLoader from "@/components/ArticleLoader";
+import ArticleTextPanel from "@/components/ArticleTextPanel";
 import AuthPanel from "@/components/AuthPanel";
 import ChatPanel from "@/components/ChatPanel";
 import ExpandedCanvas from "@/components/ExpandedCanvas";
@@ -401,6 +402,7 @@ export default function Home() {
             }`}
           >
             <div className="flex h-full w-80 flex-col gap-4 overflow-y-auto p-4">
+              {/* Article URL loader ─────────────────────────── */}
               <div className="card shrink-0 p-5">
                 <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-700">
                   Load Article
@@ -413,13 +415,23 @@ export default function Home() {
               </div>
 
               {session?.article && (
-                <SummaryPanel
-                  article={session.article}
-                  summary={session.summary}
-                  onGenerateSummary={handleSummarize}
-                  onExpand={() => openArticleCanvas(session.article!, session.summary)}
-                  isSummarizing={summarizing}
-                />
+                <>
+                  {/* Summary card — grows to fill available space ── */}
+                  <div className="flex min-h-[240px] flex-col" style={{ flex: "0 0 auto" }}>
+                    <SummaryPanel
+                      article={session.article}
+                      summary={session.summary}
+                      onGenerateSummary={handleSummarize}
+                      onExpand={() => openArticleCanvas(session.article!, session.summary)}
+                      isSummarizing={summarizing}
+                    />
+                  </div>
+
+                  {/* Full article text — collapsible ──────────────── */}
+                  <div className="shrink-0">
+                    <ArticleTextPanel content={session.article.content} />
+                  </div>
+                </>
               )}
 
               {!session?.article && !loadingArticle && (

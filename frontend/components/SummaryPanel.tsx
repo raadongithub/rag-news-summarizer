@@ -25,66 +25,89 @@ export default function SummaryPanel({
       })
     : null;
 
+  const metaParts = [
+    article.source_domain,
+    article.authors.length > 0 ? article.authors.join(", ") : null,
+    publishDate,
+    `${article.word_count.toLocaleString()} words`,
+  ].filter(Boolean) as string[];
+
   return (
-    <div className="space-y-4">
-      <div className="card flex flex-col p-5" style={{ height: "28vh" }}>
-        <div className="mb-4 flex items-start justify-between gap-4 shrink-0">
-          <div>
-            <h2 className="text-base font-semibold leading-snug text-slate-950">{article.title}</h2>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-              <span>{article.source_domain}</span>
-              {article.authors.length > 0 && <span>{article.authors.join(", ")}</span>}
-              {publishDate && <span>{publishDate}</span>}
-              <span>{article.word_count.toLocaleString()} words</span>
-            </div>
-          </div>
+    <div className="card flex flex-col overflow-hidden">
+      {/* ── Article identity ──────────────────────────── */}
+      <div className="shrink-0 border-b border-slate-100 px-5 pt-5 pb-4">
+        <h2 className="text-base font-semibold leading-snug text-slate-950">
+          {article.title}
+        </h2>
 
-          <div className="flex shrink-0 items-center gap-2">
-            {!summary && (
-              <button
-                className="btn-secondary text-xs py-1 px-3"
-                onClick={onGenerateSummary}
-                disabled={isSummarizing}
-                type="button"
-              >
-                {isSummarizing ? "Generating..." : "Generate"}
-              </button>
-            )}
-            <button className="btn-ghost" onClick={onExpand} type="button">
-              Open canvas
-            </button>
+        {metaParts.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1">
+            {metaParts.map((part, i) => (
+              <span key={i} className="flex items-center gap-1.5 text-xs text-slate-500">
+                {i > 0 && <span className="text-slate-300" aria-hidden="true">·</span>}
+                {part}
+              </span>
+            ))}
           </div>
-        </div>
+        )}
+      </div>
 
-        <div className="mb-3 shrink-0">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
-            Article Summary
-          </h3>
-        </div>
-        <div className="flex-1 overflow-y-auto">
+      {/* ── Summary content ───────────────────────────── */}
+      <div className="flex min-h-0 flex-1 flex-col px-5 pt-4 pb-3">
+        <p className="mb-3 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Summary
+        </p>
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {summary ? (
             <p className="text-sm leading-7 text-slate-700">{summary}</p>
           ) : (
             <p className="text-sm italic text-slate-400">
-              Click "Generate" to create a full article summary.
+              {isSummarizing
+                ? "Generating summary…"
+                : "Generate a summary to see it here."}
             </p>
           )}
         </div>
       </div>
 
-      <div className="card flex flex-col p-5" style={{ height: "28vh" }}>
-        <div className="mb-3 flex items-center justify-between gap-3 shrink-0">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
-            Full Article Text
-          </h3>
-          <button className="btn-ghost" onClick={onExpand} type="button">
-            Expand
+      {/* ── Action row ────────────────────────────────── */}
+      <div className="shrink-0 border-t border-slate-100 px-5 py-3 flex items-center justify-end gap-2">
+        {!summary && (
+          <button
+            className="btn-secondary py-1.5 px-3 text-xs"
+            onClick={onGenerateSummary}
+            disabled={isSummarizing}
+            type="button"
+          >
+            {isSummarizing ? (
+              <span className="flex items-center gap-1.5">
+                <SpinnerIcon />
+                Generating…
+              </span>
+            ) : (
+              "Generate summary"
+            )}
           </button>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          <p className="whitespace-pre-wrap text-sm leading-7 text-slate-600">{article.content}</p>
-        </div>
+        )}
+        <button className="btn-ghost" onClick={onExpand} type="button">
+          Open canvas
+        </button>
       </div>
     </div>
+  );
+}
+
+function SpinnerIcon() {
+  return (
+    <svg
+      className="h-3 w-3 animate-spin"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+    </svg>
   );
 }
