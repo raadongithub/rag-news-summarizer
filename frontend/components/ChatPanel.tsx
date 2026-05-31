@@ -75,7 +75,7 @@ export default function ChatPanel({
         />
         <button
           type="submit"
-          className="btn-primary px-4"
+          className="btn-primary inline-flex h-11 w-11 items-center justify-center p-0"
           disabled={disabled || isThinking || !input.trim()}
           aria-label="Send question"
         >
@@ -300,15 +300,26 @@ function ThinkingDots() {
   );
 }
 
+/**
+ * Render the send glyph used by chat input submit buttons.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ *     Paper-plane style icon with strong directional affordance.
+ */
 function SendIcon() {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className="h-5 w-5"
+      aria-hidden="true"
     >
-      <path d="M2.57 2.92a1 1 0 011.05-.18l12.9 5.66a1 1 0 010 1.83L3.62 15.89A1 1 0 012.2 14.97l1.08-4.17a1 1 0 00-.23-.92L1.6 8.33a1 1 0 01.97-1.65l4.71.59a1 1 0 00.63-.12l8.41-4.23a1 1 0 01.2-.08L3.94 8.2l-.83 3.22 13.41-5.04L3.11 3.1l-.54-.18z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 20 21 12 3 4v6l12 2-12 2v6Z" />
     </svg>
   );
 }

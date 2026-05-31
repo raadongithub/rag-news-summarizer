@@ -6,7 +6,12 @@ export const metadata: Metadata = {
   title: "News Summarizer",
   description: "Authenticated RAG-powered news article summarizer and Q&A",
   icons: {
-    icon: "/icon.svg",
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml", sizes: "any" },
+      { url: "/apple-icon.svg", type: "image/svg+xml", sizes: "180x180" },
+    ],
+    shortcut: "/icon.svg",
+    apple: "/apple-icon.svg",
   },
 };
 

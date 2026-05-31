@@ -66,6 +66,33 @@ export interface ChatResponse {
   passages: Passage[];
 }
 
+export interface ChatStreamDoneEvent {
+  answer: string;
+  critique: Critique | null;
+  passages: Passage[];
+}
+
+interface ChatStreamTokenEvent {
+  type: "token";
+  token: string;
+}
+
+interface ChatStreamDonePayload extends ChatStreamDoneEvent {
+  type: "done";
+}
+
+interface ChatStreamErrorEvent {
+  type: "error";
+  message: string;
+}
+
+type ChatStreamEvent = ChatStreamTokenEvent | ChatStreamDonePayload | ChatStreamErrorEvent;
+
+export interface ChatStreamHandlers {
+  onToken?: (token: string) => void;
+  onDone?: (event: ChatStreamDoneEvent) => void;
+}
+
 export interface AuthResponse {
   access_token: string;
   token_type: "bearer";
@@ -129,6 +156,48 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+/**
+ * Build API request headers with auth when available.
+ *
+ * Parameters
+ * ----------
+ * base : HeadersInit | undefined
+ *     Optional headers to merge into the result.
+ *
+ * Returns
+ * -------
+ * Headers
+ *     Headers object with content type and bearer token when present.
+ */
+function buildApiHeaders(base?: HeadersInit): Headers {
+  const token = getStoredAccessToken();
+  const headers = new Headers(base);
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  return headers;
+}
+
+/**
+ * Read a non-empty NDJSON line as a chat stream event payload.
+ *
+ * Parameters
+ * ----------
+ * line : string
+ *     Single NDJSON line from the stream.
+ *
+ * Returns
+ * -------
+ * ChatStreamEvent
+ *     Parsed event payload.
+ */
+function parseStreamEvent(line: string): ChatStreamEvent {
+  return JSON.parse(line) as ChatStreamEvent;
+}
+
 export const api = {
   health: () => request<{ status: string }>("/health"),
 
@@ -166,4 +235,85 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ question }),
     }),
+
+  /**
+   * Stream a chat answer as incremental token events.
+   *
+   * Parameters
+   * ----------
+   * sessionId : string
+   *     Active session identifier.
+   * question : string
+   *     User question for the article.
+   * handlers : ChatStreamHandlers
+   *     Token and completion callbacks for incremental rendering.
+   *
+   * Returns
+   * -------
+   * Promise<void>
+   *     Resolves when the stream completes successfully.
+   */
+  async chatStream(
+    sessionId: string,
+    question: string,
+    handlers: ChatStreamHandlers
+  ): Promise<void> {
+    const response = await fetch(`${API_BASE}/sessions/${sessionId}/chat/stream`, {
+      method: "POST",
+      headers: buildApiHeaders(),
+      body: JSON.stringify({ question }),
+    });
+
+    if (!response.ok) {
+      let detail = `HTTP ${response.status}`;
+      let errorCode: string | null = null;
+      try {
+        const body = await response.json();
+        detail = typeof body.detail === "string" ? body.detail : detail;
+        errorCode = typeof body.error_code === "string" ? body.error_code : null;
+      } catch {
+        // Ignore parse errors and keep fallback details.
+      }
+      throw new ApiError(detail, response.status, errorCode);
+    }
+
+    if (!response.body) {
+      throw new ApiError("Streaming response body was unavailable", 500);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) continue;
+
+        const event = parseStreamEvent(line);
+        if (event.type === "token") {
+          handlers.onToken?.(event.token);
+          continue;
+        }
+
+        if (event.type === "done") {
+          handlers.onDone?.({
+            answer: event.answer,
+            critique: event.critique,
+            passages: event.passages,
+          });
+          continue;
+        }
+
+        throw new ApiError(event.message || "Chat stream failed", 500);
+      }
+    }
+  },
 };

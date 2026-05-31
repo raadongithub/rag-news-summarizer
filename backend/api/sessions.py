@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+import re
+
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..db import get_db_session
@@ -19,6 +24,24 @@ from ..services import SessionService
 from .dependencies import get_current_user
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+
+
+def _tokenize_for_streaming(answer: str) -> list[str]:
+    """Split a final answer into whitespace-preserving token chunks.
+
+    Parameters
+    ----------
+    answer : str
+        Final assistant answer text.
+
+    Returns
+    -------
+    list[str]
+        Incremental chunks that preserve spacing for UI append behavior.
+    """
+
+    chunks = re.findall(r"\S+\s*", answer)
+    return chunks if chunks else [answer]
 
 
 @router.get("", response_model=list[SessionListItemResponse])
@@ -221,3 +244,77 @@ async def chat(
         chunk_store=getattr(runtime, "chunk_store", None),
         embeddings=getattr(runtime, "embeddings", None),
     )
+
+
+@router.post("/{session_id}/chat/stream")
+async def chat_stream(
+    session_id: str,
+    payload: ChatRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db_session: Session = Depends(get_db_session),
+) -> StreamingResponse:
+    """Stream a chat answer as incremental token chunks.
+
+    Summary generation remains strictly non-streaming and is handled by the
+    summarize endpoint. This route is only for chat token streaming.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier.
+    payload : ChatRequest
+        Chat request payload.
+    request : Request
+        FastAPI request object.
+    current_user : User
+        Authenticated user.
+    db_session : Session
+        Active SQLAlchemy session.
+
+    Returns
+    -------
+    StreamingResponse
+        NDJSON stream with token and done events.
+    """
+
+    runtime = getattr(request.app.state, "runtime", None)
+
+    async def stream_events():
+        """Yield NDJSON events for incremental chat rendering.
+
+        Returns
+        -------
+        AsyncIterator[str]
+            Newline-delimited JSON events.
+        """
+
+        try:
+            result = await SessionService(db_session).answer_question(
+                session_id,
+                current_user,
+                payload.question,
+                chunk_store=getattr(runtime, "chunk_store", None),
+                embeddings=getattr(runtime, "embeddings", None),
+            )
+
+            answer = str(result.get("answer", ""))
+            for token in _tokenize_for_streaming(answer):
+                yield json.dumps({"type": "token", "token": token}) + "\n"
+                await asyncio.sleep(0)
+
+            yield (
+                json.dumps(
+                    {
+                        "type": "done",
+                        "answer": answer,
+                        "critique": result.get("critique"),
+                        "passages": result.get("passages", []),
+                    }
+                )
+                + "\n"
+            )
+        except Exception as exc:
+            yield json.dumps({"type": "error", "message": str(exc)}) + "\n"
+
+    return StreamingResponse(stream_events(), media_type="application/x-ndjson")

@@ -227,8 +227,26 @@ export default function Home() {
     }
   }
 
+  /**
+   * Send a chat question using the streaming chat pipeline.
+   *
+   * Chat responses are rendered incrementally from stream tokens.
+   * Summary generation is intentionally handled by the separate batch
+   * summarize flow and is not mixed into this handler.
+   *
+   * Parameters
+   * ----------
+   * question : string
+   *     User question submitted from the chat input.
+   *
+   * Returns
+   * -------
+   * Promise<void>
+   *     Resolves when token streaming and final synchronization complete.
+   */
   async function handleSendQuestion(question: string) {
     if (!session) return;
+    const activeSessionId = session.id;
     setErrorMessage(null);
 
     setSession((previous) =>
@@ -238,6 +256,7 @@ export default function Home() {
             chat_history: [
               ...previous.chat_history,
               { role: "user", content: question, critique: null, passages: [] },
+              { role: "assistant", content: "", critique: null, passages: [] },
             ],
           }
         : previous
@@ -245,15 +264,53 @@ export default function Home() {
     setThinking(true);
 
     try {
-      await api.chat(session.id, question);
-      const refreshedSession = await api.getSession(session.id);
+      await api.chatStream(activeSessionId, question, {
+        onToken: (token) => {
+          setSession((previous) => {
+            if (!previous) return previous;
+            const nextHistory = [...previous.chat_history];
+            const lastIndex = nextHistory.length - 1;
+            if (lastIndex < 0 || nextHistory[lastIndex].role !== "assistant") {
+              return previous;
+            }
+            nextHistory[lastIndex] = {
+              ...nextHistory[lastIndex],
+              content: `${nextHistory[lastIndex].content}${token}`,
+            };
+            return { ...previous, chat_history: nextHistory };
+          });
+        },
+        onDone: (event) => {
+          setSession((previous) => {
+            if (!previous) return previous;
+            const nextHistory = [...previous.chat_history];
+            const lastIndex = nextHistory.length - 1;
+            if (lastIndex < 0 || nextHistory[lastIndex].role !== "assistant") {
+              return previous;
+            }
+            nextHistory[lastIndex] = {
+              ...nextHistory[lastIndex],
+              content: event.answer,
+              critique: event.critique,
+              passages: event.passages,
+            };
+            return {
+              ...previous,
+              chat_history: nextHistory,
+              retrieved_passages: event.passages,
+            };
+          });
+        },
+      });
+
+      const refreshedSession = await api.getSession(activeSessionId);
       setSession(refreshedSession);
     } catch (error) {
       if (handleUnauthorized(error, "Please sign in again to continue.")) return;
       const message = error instanceof Error ? error.message : String(error);
       setErrorMessage(`Chat error: ${message}`);
       try {
-        const refreshedSession = await api.getSession(session.id);
+        const refreshedSession = await api.getSession(activeSessionId);
         setSession(refreshedSession);
       } catch {
         // Preserve existing UI state when refresh fails.
@@ -330,6 +387,19 @@ export default function Home() {
   const [leftPanelWidth, setLeftPanelWidth] = useState(320);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const isProcessing = loadingArticle || summarizing || thinking;
+
+  const expandedArticle =
+    expandedState &&
+    session?.article &&
+    expandedState.article.url === session.article.url
+      ? session.article
+      : expandedState?.article;
+  const expandedSummary =
+    expandedState &&
+    session?.article &&
+    expandedState.article.url === session.article.url
+      ? session.summary
+      : expandedState?.summary;
 
   /**
    * Start the drag-resize interaction for the left sidebar.
@@ -581,10 +651,10 @@ export default function Home() {
         </main>
       </div>
 
-      {expandedState && (
+      {expandedState && expandedArticle && (
         <ExpandedCanvas
-          article={expandedState.article}
-          summary={expandedState.summary}
+          article={expandedArticle}
+          summary={expandedSummary ?? null}
           contextTitle={expandedState.contextTitle}
           contextBody={expandedState.contextBody}
           contextLabel={expandedState.contextLabel}
