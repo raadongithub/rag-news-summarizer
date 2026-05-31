@@ -12,12 +12,37 @@ from ..schema import (
     ChatAnswerResponse,
     ChatRequest,
     SessionHistoryResponse,
+    SessionListItemResponse,
     SessionResponse,
 )
 from ..services import SessionService
 from .dependencies import get_current_user
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+
+
+@router.get("", response_model=list[SessionListItemResponse])
+def list_sessions(
+    current_user: User = Depends(get_current_user),
+    db_session: Session = Depends(get_db_session),
+) -> list[dict]:
+    """Return compact summaries of the authenticated user's recent sessions.
+
+    Parameters
+    ----------
+    current_user : User
+        Authenticated user.
+    db_session : Session
+        Active SQLAlchemy session.
+
+    Returns
+    -------
+    list[dict]
+        Compact session list-item payloads ordered by most recently
+        updated first.
+    """
+
+    return SessionService(db_session).list_sessions(current_user)
 
 
 @router.post("", response_model=SessionResponse, status_code=201)

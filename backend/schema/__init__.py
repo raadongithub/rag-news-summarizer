@@ -10,6 +10,7 @@ from .session import (
     PassageResponse,
     ScrapedArticleResponse,
     SessionHistoryResponse,
+    SessionListItemResponse,
     SessionResponse,
 )
 
@@ -25,6 +26,7 @@ __all__ = [
     "RegisterRequest",
     "ScrapedArticleResponse",
     "SessionHistoryResponse",
+    "SessionListItemResponse",
     "SessionResponse",
     "UserResponse",
 ]

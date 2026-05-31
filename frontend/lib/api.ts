@@ -51,6 +51,15 @@ export interface Session {
   updated_at: string;
 }
 
+export interface SessionListItem {
+  id: string;
+  url: string | null;
+  article_title: string | null;
+  first_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ChatResponse {
   answer: string;
   critique: Critique | null;
@@ -138,6 +147,8 @@ export const api = {
   me: () => request<StoredUser>("/auth/me"),
 
   createSession: () => request<Session>("/sessions", { method: "POST" }),
+
+  listSessions: () => request<SessionListItem[]>("/sessions"),
 
   getSession: (sessionId: string) => request<Session>(`/sessions/${sessionId}`),
 

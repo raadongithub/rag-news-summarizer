@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from ..models import SessionRecord
 
+_DEFAULT_SESSION_LIST_LIMIT = 20
+
 
 class SessionRepository:
     """Repository for session persistence operations."""
@@ -68,6 +70,34 @@ class SessionRepository:
             SessionRecord.user_id == user_id,
         )
         return self.db_session.execute(statement).scalar_one_or_none()
+
+    def list_for_user(
+        self,
+        user_id: str,
+        limit: int = _DEFAULT_SESSION_LIST_LIMIT,
+    ) -> list[SessionRecord]:
+        """Return the most recent sessions owned by a user.
+
+        Parameters
+        ----------
+        user_id : str
+            Owning user identifier.
+        limit : int, optional
+            Maximum number of records to return.
+
+        Returns
+        -------
+        list[SessionRecord]
+            Sessions ordered by updated_at descending.
+        """
+
+        statement = (
+            select(SessionRecord)
+            .where(SessionRecord.user_id == user_id)
+            .order_by(SessionRecord.updated_at.desc())
+            .limit(limit)
+        )
+        return list(self.db_session.execute(statement).scalars().all())
 
     def update(self, record: SessionRecord, **fields: Any) -> SessionRecord:
         """Update mutable session fields in place.

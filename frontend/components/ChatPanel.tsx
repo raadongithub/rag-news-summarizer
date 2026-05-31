@@ -10,6 +10,8 @@ interface ChatPanelProps {
   onExpandMessage: (message: ChatMessage, index: number) => void;
   isThinking: boolean;
   disabled: boolean;
+  /** True when an article has been loaded into the session. */
+  articleLoaded: boolean;
 }
 
 export default function ChatPanel({
@@ -18,6 +20,7 @@ export default function ChatPanel({
   onExpandMessage,
   isThinking,
   disabled,
+  articleLoaded,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -38,9 +41,7 @@ export default function ChatPanel({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-1 py-2">
         {messages.length === 0 && (
-          <p className="mt-8 text-center text-sm text-slate-400">
-            Ask a question about the loaded article.
-          </p>
+          <ChatEmptyState articleLoaded={articleLoaded} />
         )}
 
         {messages.map((message, index) => (
@@ -82,6 +83,81 @@ export default function ChatPanel({
         </button>
       </form>
     </div>
+  );
+}
+
+/**
+ * Context-aware empty state displayed in the chat panel when there are no
+ * messages.
+ *
+ * Parameters
+ * ----------
+ * articleLoaded : boolean
+ *     True when an article has been successfully loaded into the session.
+ */
+function ChatEmptyState({ articleLoaded }: { articleLoaded: boolean }) {
+  if (!articleLoaded) {
+    return (
+      <div className="mt-8 flex flex-col items-center gap-3 px-4 text-center">
+        <ArticleIcon />
+        <p className="text-sm font-medium text-slate-600">No article loaded yet</p>
+        <p className="text-xs text-slate-400">
+          Paste an article URL in the panel on the left to start exploring its
+          content.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-8 flex flex-col items-center gap-3 px-4 text-center">
+      <ChatBubbleIcon />
+      <p className="text-sm font-medium text-slate-600">Ready to explore</p>
+      <p className="text-xs text-slate-400">
+        Ask a question about this article, or generate a summary from the panel
+        on the left.
+      </p>
+    </div>
+  );
+}
+
+function ArticleIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className="h-8 w-8 text-slate-300"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
+      />
+    </svg>
+  );
+}
+
+function ChatBubbleIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className="h-8 w-8 text-slate-300"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 0 1 .778-.332 48.294 48.294 0 0 0 5.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z"
+      />
+    </svg>
   );
 }
 

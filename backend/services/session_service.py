@@ -14,7 +14,7 @@ from ..models import User
 from ..repositories import SessionRepository
 from .article_service import ArticleService
 from .chat_service import ChatService
-from .serializers import serialize_session
+from .serializers import serialize_session, serialize_session_list_item
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,26 @@ class SessionService:
         self.article_service = article_service or ArticleService(self.settings)
         self.chat_service = chat_service or ChatService(self.settings)
         self.session_repository = session_repository or SessionRepository(db_session)
+
+    def list_sessions(self, user: User, limit: int = 20) -> list[dict[str, Any]]:
+        """Return compact summaries of recent sessions for a user.
+
+        Parameters
+        ----------
+        user : User
+            Owning user entity.
+        limit : int, optional
+            Maximum number of sessions to return.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            List of compact session list-item payloads ordered by most
+            recently updated first.
+        """
+
+        records = self.session_repository.list_for_user(user.id, limit=limit)
+        return [serialize_session_list_item(r) for r in records]
 
     def create_session(self, user: User) -> dict[str, Any]:
         """Create and persist a new session for a user.

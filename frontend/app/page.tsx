@@ -6,6 +6,7 @@ import ArticleLoader from "@/components/ArticleLoader";
 import AuthPanel from "@/components/AuthPanel";
 import ChatPanel from "@/components/ChatPanel";
 import ExpandedCanvas from "@/components/ExpandedCanvas";
+import SessionDropdown from "@/components/SessionDropdown";
 import SummaryPanel from "@/components/SummaryPanel";
 import { api, ApiError, type ChatMessage, type Passage, type ScrapedArticle, type Session } from "@/lib/api";
 import {
@@ -225,6 +226,21 @@ export default function Home() {
     }
   }
 
+  async function handleSwitchSession(sessionId: string) {
+    setErrorMessage(null);
+    setExpandedState(null);
+
+    try {
+      const targetSession = await api.getSession(sessionId);
+      storeSessionId(targetSession.id);
+      setSession(targetSession);
+    } catch (error) {
+      if (handleUnauthorized(error, "Please sign in again to continue.")) return;
+      const message = error instanceof Error ? error.message : String(error);
+      setErrorMessage(`Could not switch session: ${message}`);
+    }
+  }
+
   function handleLogout() {
     resetWorkspace();
     setInitializing(false);
@@ -292,9 +308,11 @@ export default function Home() {
                 {user.email}
               </div>
               {session && (
-                <span className="hidden font-mono text-xs text-slate-400 lg:inline">
-                  Session {session.id.slice(0, 8)}...
-                </span>
+                <SessionDropdown
+                  activeSessionId={session.id}
+                  onSelectSession={handleSwitchSession}
+                  disabled={isProcessing}
+                />
               )}
               <button className="btn-secondary text-xs py-2 px-3" onClick={handleNewSession} disabled={isProcessing} type="button">
                 New session
@@ -354,7 +372,7 @@ export default function Home() {
 
               {!session?.article && !loadingArticle && (
                 <p className="px-2 text-center text-sm text-slate-400">
-                  Enter a URL above to load an article.
+                  Paste an article URL above to load content into this session.
                 </p>
               )}
             </aside>
@@ -369,6 +387,7 @@ export default function Home() {
                 onExpandMessage={openMessageCanvas}
                 isThinking={thinking}
                 disabled={!session?.article || loadingArticle}
+                articleLoaded={!!session?.article}
               />
             </section>
           </div>

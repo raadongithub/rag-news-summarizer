@@ -63,6 +63,19 @@ class ScrapedArticleResponse(BaseModel):
     extraction_method: str
 
 
+class SessionListItemResponse(BaseModel):
+    """Compact session summary used in the session picker dropdown."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    url: str | None
+    article_title: str | None
+    first_message: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class SessionResponse(BaseModel):
     """Serialized persisted session."""
 
