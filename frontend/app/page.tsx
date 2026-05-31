@@ -273,6 +273,7 @@ export default function Home() {
     });
   }
 
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const isProcessing = loadingArticle || summarizing || thinking;
 
   if (initializing) {
@@ -294,39 +295,83 @@ export default function Home() {
   return (
     <>
       <div className="flex h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(125,211,252,0.16),_transparent_18%),linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)]">
-        <header className="shrink-0 border-b border-white/70 bg-white/75 px-6 py-4 backdrop-blur">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-            <div>
-              <h1 className="text-lg font-semibold text-slate-950">News Summarizer</h1>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Private RAG-powered article workspace
-              </p>
+
+        {/* ── Header ─────────────────────────────────────────────── */}
+        <header className="shrink-0 border-b border-white/70 bg-white/75 backdrop-blur">
+          <div className="flex h-14 items-center gap-3 px-4">
+
+            {/* Left: panel toggle + brand */}
+            <div className="flex shrink-0 items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setLeftPanelOpen((v) => !v)}
+                title={leftPanelOpen ? "Hide article panel" : "Show article panel"}
+                className="btn-ghost rounded-lg p-1.5"
+                aria-label={leftPanelOpen ? "Hide article panel" : "Show article panel"}
+              >
+                <PanelToggleIcon open={leftPanelOpen} />
+              </button>
+              <div className="hidden sm:block leading-tight">
+                <h1 className="text-base font-semibold text-slate-950 leading-tight">News Summarizer</h1>
+                <p className="text-[11px] text-slate-500 leading-tight">Private RAG-powered article workspace</p>
+              </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="hidden rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs text-slate-500 sm:block">
-                {user.email}
-              </div>
-              {session && (
-                <SessionDropdown
-                  activeSessionId={session.id}
-                  onSelectSession={handleSwitchSession}
-                  disabled={isProcessing}
-                />
+            {/* Center: article metadata (flexible spacer) */}
+            <div className="flex min-w-0 flex-1 items-center justify-center px-4">
+              {session?.article && (
+                <div className="hidden max-w-lg items-center gap-2 lg:flex">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 0 1 2-2h4.586A2 2 0 0 1 12 2.586L15.414 6A2 2 0 0 1 16 7.414V16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4Zm2 6a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5A.75.75 0 0 1 6 10Zm0 2.5a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1-.75-.75Z" clipRule="evenodd" />
+                  </svg>
+                  <span className="truncate text-sm font-medium text-slate-600">
+                    {session.article.title || session.url}
+                  </span>
+                </div>
               )}
-              <button className="btn-secondary text-xs py-2 px-3" onClick={handleNewSession} disabled={isProcessing} type="button">
-                New session
-              </button>
-              <button className="btn-ghost" onClick={handleLogout} type="button">
-                Logout
-              </button>
+            </div>
+
+            {/* Right: session controls + divider + user controls */}
+            <div className="flex shrink-0 items-center gap-2">
+              {/* Session group */}
+              {session && (
+                <div className="flex items-center gap-1.5">
+                  <SessionDropdown
+                    activeSessionId={session.id}
+                    onSelectSession={handleSwitchSession}
+                    disabled={isProcessing}
+                  />
+                  <button
+                    className="btn-secondary py-1.5 px-3 text-xs"
+                    onClick={handleNewSession}
+                    disabled={isProcessing}
+                    type="button"
+                  >
+                    New session
+                  </button>
+                </div>
+              )}
+
+              {/* Divider */}
+              <div className="mx-1 h-5 w-px bg-slate-200" aria-hidden="true" />
+
+              {/* User group */}
+              <div className="flex items-center gap-1.5">
+                <span className="hidden max-w-[180px] truncate rounded-full bg-slate-100/80 px-2.5 py-1 text-xs text-slate-500 md:block">
+                  {user.email}
+                </span>
+                <button className="btn-ghost" onClick={handleLogout} type="button">
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
         </header>
 
+        {/* ── Banners ─────────────────────────────────────────────── */}
         {errorMessage && (
-          <div className="shrink-0 border-b border-rose-200 bg-rose-50/95 px-6 py-3">
-            <div className="mx-auto flex max-w-7xl items-start justify-between gap-4">
+          <div className="shrink-0 border-b border-rose-200 bg-rose-50/95 px-4 py-3">
+            <div className="flex items-start justify-between gap-4">
               <p className="text-sm text-rose-700">{errorMessage}</p>
               <button
                 className="shrink-0 text-rose-400 transition hover:text-rose-600"
@@ -341,14 +386,21 @@ export default function Home() {
         )}
 
         {session?.status === "processing" && !isProcessing && (
-          <div className="shrink-0 border-b border-sky-200 bg-sky-50/95 px-6 py-2">
-            <div className="mx-auto max-w-7xl text-sm text-sky-700">Processing...</div>
+          <div className="shrink-0 border-b border-sky-200 bg-sky-50/95 px-4 py-2 text-sm text-sky-700">
+            Processing…
           </div>
         )}
 
-        <main className="mx-auto flex w-full max-w-7xl flex-1 overflow-hidden px-4 py-6 sm:px-6">
-          <div className="grid h-full w-full grid-cols-1 gap-6 lg:grid-cols-[390px_1fr]">
-            <aside className="flex h-full flex-col gap-5 overflow-y-auto pr-1">
+        {/* ── Main three-section layout ───────────────────────────── */}
+        <main className="flex flex-1 overflow-hidden">
+
+          {/* Left panel – collapsible article workspace */}
+          <div
+            className={`shrink-0 overflow-hidden border-r border-slate-200/70 transition-[width] duration-300 ease-in-out ${
+              leftPanelOpen ? "w-80" : "w-0"
+            }`}
+          >
+            <div className="flex h-full w-80 flex-col gap-4 overflow-y-auto p-4">
               <div className="card shrink-0 p-5">
                 <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-700">
                   Load Article
@@ -375,9 +427,12 @@ export default function Home() {
                   Paste an article URL above to load content into this session.
                 </p>
               )}
-            </aside>
+            </div>
+          </div>
 
-            <section className="card flex min-h-0 flex-col overflow-hidden p-5">
+          {/* Center – chat interface (primary workspace) */}
+          <section className="flex flex-1 flex-col overflow-hidden p-4">
+            <div className="card flex min-h-0 flex-1 flex-col overflow-hidden p-5">
               <h2 className="mb-4 shrink-0 text-sm font-semibold uppercase tracking-wide text-slate-700">
                 Chat with the Article
               </h2>
@@ -389,8 +444,8 @@ export default function Home() {
                 disabled={!session?.article || loadingArticle}
                 articleLoaded={!!session?.article}
               />
-            </section>
-          </div>
+            </div>
+          </section>
         </main>
       </div>
 
@@ -406,5 +461,33 @@ export default function Home() {
         />
       )}
     </>
+  );
+}
+
+function PanelToggleIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      {open ? (
+        /* panel-left-close: two columns, left filled */
+        <path
+          fillRule="evenodd"
+          d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z"
+          clipRule="evenodd"
+        />
+      ) : (
+        /* panel-left-open */
+        <path
+          fillRule="evenodd"
+          d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z"
+          clipRule="evenodd"
+        />
+      )}
+    </svg>
   );
 }
