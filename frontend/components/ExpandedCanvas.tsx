@@ -11,9 +11,40 @@ interface ExpandedCanvasProps {
   contextBody?: string;
   contextLabel?: string;
   passages?: Passage[];
+  onGenerateSummary?: () => void;
+  isSummarizing?: boolean;
   onClose: () => void;
 }
 
+/**
+ * Render the full-screen article canvas with summary and context panels.
+ *
+ * Parameters
+ * ----------
+ * article : ScrapedArticle
+ *     Active article shown in the expanded view.
+ * summary : string | null
+ *     Generated summary text for the active article.
+ * contextTitle : string, optional
+ *     Title for contextual question or answer details.
+ * contextBody : string, optional
+ *     Body text for contextual details.
+ * contextLabel : string, optional
+ *     Label shown above contextual details.
+ * passages : list of Passage, optional
+ *     Supporting retrieval passages shown when present.
+ * onGenerateSummary : function, optional
+ *     Callback invoked to start summary generation from this canvas.
+ * isSummarizing : bool, optional
+ *     Indicates whether summary generation is in progress.
+ * onClose : function
+ *     Callback invoked to close the expanded canvas.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ *     Full-screen overlay canvas for article exploration.
+ */
 export default function ExpandedCanvas({
   article,
   summary,
@@ -21,6 +52,8 @@ export default function ExpandedCanvas({
   contextBody,
   contextLabel,
   passages = [],
+  onGenerateSummary,
+  isSummarizing = false,
   onClose,
 }: ExpandedCanvasProps) {
   useEffect(() => {
@@ -69,9 +102,25 @@ export default function ExpandedCanvas({
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                   Generated summary
                 </p>
-                <p className="mt-3 text-sm leading-7 text-slate-700">
-                  {summary || "Generate a summary to see it here."}
-                </p>
+                {summary ? (
+                  <p className="mt-3 text-sm leading-7 text-slate-700">{summary}</p>
+                ) : (
+                  <div className="mt-3">
+                    <p className="text-sm leading-7 text-slate-600">
+                      Generate a summary to see it here.
+                    </p>
+                    {onGenerateSummary && (
+                      <button
+                        type="button"
+                        className="btn-secondary mt-3 px-3 py-1.5 text-xs"
+                        onClick={onGenerateSummary}
+                        disabled={isSummarizing}
+                      >
+                        {isSummarizing ? "Generating..." : "Generate summary"}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {showContext && (

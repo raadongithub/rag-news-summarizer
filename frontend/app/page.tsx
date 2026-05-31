@@ -33,7 +33,19 @@ interface ExpandedState {
   passages?: Passage[];
 }
 
+/**
+ * Render the authenticated article workspace and coordinate session actions.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ *     Root workspace UI, including header, sidebar, chat surface, and
+ *     optional expanded content overlays.
+ */
 export default function Home() {
+  const MIN_LEFT_PANEL_WIDTH = 280;
+  const MAX_LEFT_PANEL_WIDTH = 520;
+
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<StoredUser | null>(null);
   const [loadingArticle, setLoadingArticle] = useState(false);
@@ -315,7 +327,56 @@ export default function Home() {
   }
 
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [leftPanelWidth, setLeftPanelWidth] = useState(320);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const isProcessing = loadingArticle || summarizing || thinking;
+
+  /**
+   * Start the drag-resize interaction for the left sidebar.
+   *
+   * Parameters
+   * ----------
+   * event : React.MouseEvent<HTMLDivElement>
+   *     Mouse down event originating from the sidebar resize handle.
+   *
+   * Returns
+   * -------
+   * void
+   */
+  function handleSidebarResizeStart(event: React.MouseEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsResizingSidebar(true);
+  }
+
+  useEffect(() => {
+    if (!isResizingSidebar) {
+      return;
+    }
+
+    function handleMouseMove(event: MouseEvent) {
+      const nextWidth = Math.min(
+        MAX_LEFT_PANEL_WIDTH,
+        Math.max(MIN_LEFT_PANEL_WIDTH, event.clientX)
+      );
+      setLeftPanelWidth(nextWidth);
+    }
+
+    function stopResizing() {
+      setIsResizingSidebar(false);
+    }
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", stopResizing);
+
+    return () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", stopResizing);
+    };
+  }, [MAX_LEFT_PANEL_WIDTH, MIN_LEFT_PANEL_WIDTH, isResizingSidebar]);
 
   if (initializing) {
     return (
@@ -338,7 +399,7 @@ export default function Home() {
       <div className="flex h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(125,211,252,0.16),_transparent_18%),linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)]">
 
         {/* Header */}
-        <header className="shrink-0 border-b border-white/70 bg-white/75 backdrop-blur">
+        <header className="relative z-50 shrink-0 border-b border-white/70 bg-white/75 backdrop-blur">
           <div className="flex h-14 items-center gap-3 px-4">
 
             {/* Left: panel toggle + brand */}
@@ -372,7 +433,7 @@ export default function Home() {
               )}
             </div>
 
-            {/* Right: session controls + divider + user controls */}
+            {/* Right: session controls */}
             <div className="flex shrink-0 items-center gap-2">
               {/* Session group */}
               {session && (
@@ -394,19 +455,6 @@ export default function Home() {
                   </button>
                 </div>
               )}
-
-              {/* Divider */}
-              <div className="mx-1 h-5 w-px bg-slate-200" aria-hidden="true" />
-
-              {/* User group */}
-              <div className="flex items-center gap-1.5">
-                <span className="hidden max-w-[180px] truncate rounded-full bg-slate-100/80 px-2.5 py-1 text-xs text-slate-500 md:block">
-                  {user.email}
-                </span>
-                <button className="btn-ghost" onClick={handleLogout} type="button">
-                  Logout
-                </button>
-              </div>
             </div>
           </div>
         </header>
@@ -439,50 +487,79 @@ export default function Home() {
 
           {/* Left panel – collapsible article workspace */}
           <div
-            className={`shrink-0 overflow-hidden border-r border-slate-200/70 transition-[width] duration-300 ease-in-out ${
-              leftPanelOpen ? "w-80" : "w-0"
-            }`}
+            className="relative shrink-0 overflow-hidden border-r border-slate-200/70 transition-[width] duration-300 ease-in-out"
+            style={{ width: leftPanelOpen ? leftPanelWidth : 0 }}
           >
-            <div className="flex h-full w-80 flex-col gap-4 overflow-y-auto p-4">
+            <div className="flex h-full flex-col gap-4 p-4">
               {/*
                * Article URL loader — only shown before an article is attached.
                * Once a session has an article the form is intentionally hidden:
                * one session = one article. A new session is required to load a
                * different article.
                */}
-              {!session?.article && (
-                <div className="card shrink-0 p-5">
-                  <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-700">
-                    Load Article
-                  </h2>
-                  <ArticleLoader
-                    onLoad={handleLoadArticle}
-                    isLoading={loadingArticle}
-                    currentUrl={session?.url ?? null}
-                  />
-                  {!loadingArticle && (
-                    <p className="mt-4 text-center text-xs text-slate-400">
-                      Paste an article URL above to load content into this session.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {session?.article && (
-                <>
-                  {/* Summary card */}
-                  <div className="flex min-h-[240px] flex-col" style={{ flex: "0 0 auto" }}>
-                    <SummaryPanel
-                      article={session.article}
-                      summary={session.summary}
-                      onGenerateSummary={handleSummarize}
-                      onExpand={() => openArticleCanvas(session.article!, session.summary)}
-                      isSummarizing={summarizing}
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+                {!session?.article && (
+                  <div className="card shrink-0 p-5">
+                    <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-700">
+                      Load Article
+                    </h2>
+                    <ArticleLoader
+                      onLoad={handleLoadArticle}
+                      isLoading={loadingArticle}
+                      currentUrl={session?.url ?? null}
                     />
+                    {!loadingArticle && (
+                      <p className="mt-4 text-center text-xs text-slate-400">
+                        Paste an article URL above to load content into this session.
+                      </p>
+                    )}
                   </div>
-                </>
-              )}
+                )}
+
+                {session?.article && (
+                  <>
+                    {/* Summary card */}
+                    <div className="flex min-h-[240px] flex-col" style={{ flex: "0 0 auto" }}>
+                      <SummaryPanel
+                        article={session.article}
+                        summary={session.summary}
+                        onGenerateSummary={handleSummarize}
+                        onExpand={() => openArticleCanvas(session.article!, session.summary)}
+                        isSummarizing={summarizing}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="mt-auto shrink-0 border-t border-slate-200/80 pt-3">
+                <div className="rounded-2xl border border-white/70 bg-white/70 px-3.5 py-3 backdrop-blur">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Account
+                  </p>
+                  <p className="mt-1 truncate text-sm font-medium text-slate-700" title={user.email}>
+                    {user.email}
+                  </p>
+                  <button
+                    className="mt-2 w-full rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 hover:text-rose-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+                    onClick={handleLogout}
+                    type="button"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </div>
             </div>
+
+            {leftPanelOpen && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize sidebar"
+                onMouseDown={handleSidebarResizeStart}
+                className="absolute right-0 top-0 h-full w-2 cursor-col-resize bg-transparent transition hover:bg-sky-200/50"
+              />
+            )}
           </div>
 
           {/* Center – chat interface (primary workspace) */}
@@ -512,6 +589,8 @@ export default function Home() {
           contextBody={expandedState.contextBody}
           contextLabel={expandedState.contextLabel}
           passages={expandedState.passages}
+          onGenerateSummary={handleSummarize}
+          isSummarizing={summarizing}
           onClose={() => setExpandedState(null)}
         />
       )}
@@ -521,6 +600,7 @@ export default function Home() {
           content={session.article.content}
           showOnboardingTip={showOnboarding}
           onDismissOnboarding={handleDismissOnboarding}
+          onExpand={() => openArticleCanvas(session.article!, session.summary)}
         />
       )}
     </>

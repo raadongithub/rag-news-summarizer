@@ -163,7 +163,7 @@ export default function SessionDropdown({
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative z-40">
       <button
         type="button"
         className="btn-secondary flex items-center gap-1.5 text-xs py-2 px-3"
@@ -183,7 +183,7 @@ export default function SessionDropdown({
         <div
           role="listbox"
           aria-label="Previous sessions"
-          className="absolute right-0 z-50 mt-2 w-72 rounded-2xl border border-white/70 bg-white/95 shadow-[0_16px_50px_-20px_rgba(15,23,42,0.35)] backdrop-blur ring-1 ring-slate-100 focus:outline-none"
+          className="absolute right-0 z-[90] mt-2 w-72 rounded-2xl border border-white/70 bg-white/95 shadow-[0_16px_50px_-20px_rgba(15,23,42,0.35)] backdrop-blur ring-1 ring-slate-100 focus:outline-none"
         >
           <div className="border-b border-slate-100 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

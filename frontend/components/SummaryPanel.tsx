@@ -10,6 +10,27 @@ interface SummaryPanelProps {
   isSummarizing: boolean;
 }
 
+/**
+ * Render article metadata, summary content, and summary actions.
+ *
+ * Parameters
+ * ----------
+ * article : ScrapedArticle
+ *     Loaded article whose metadata is shown in the summary card.
+ * summary : string | null
+ *     Generated summary text. When null, summary content is hidden.
+ * onGenerateSummary : () => void
+ *     Callback used to start summary generation.
+ * onExpand : () => void
+ *     Callback used to open the expanded canvas view.
+ * isSummarizing : boolean
+ *     Indicates whether summary generation is currently in progress.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ *     Summary panel card for the article workspace.
+ */
 export default function SummaryPanel({
   article,
   summary,
@@ -25,46 +46,49 @@ export default function SummaryPanel({
       })
     : null;
 
-  const metaParts = [
-    article.source_domain,
-    article.authors.length > 0 ? article.authors.join(", ") : null,
-    publishDate,
-    `${article.word_count.toLocaleString()} words`,
-  ].filter(Boolean) as string[];
+  const metadata = [
+    { label: "Source", value: article.source_domain || "Unknown" },
+    {
+      label: "Authors",
+      value: article.authors.length > 0 ? article.authors.join(", ") : "Unknown",
+    },
+    { label: "Published", value: publishDate || "Unknown" },
+    { label: "Length", value: `${article.word_count.toLocaleString()} words` },
+  ];
+  const hasSummaryContent = Boolean(summary || isSummarizing);
 
   return (
     <div className="card flex flex-col overflow-hidden">
-      {/* Article identity */}
+      {/* Article metadata */}
       <div className="shrink-0 border-b border-slate-100 px-5 pt-5 pb-4">
-        <h2 className="text-base font-semibold leading-snug text-slate-950">
-          {article.title}
-        </h2>
-
-        {metaParts.length > 0 && (
-          <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1">
-            {metaParts.map((part, i) => (
-              <span key={i} className="flex items-center gap-1.5 text-xs text-slate-500">
-                {i > 0 && <span className="text-slate-300" aria-hidden="true">·</span>}
-                {part}
+        <div className="space-y-2">
+          {metadata.map((item) => (
+            <div key={item.label} className="grid grid-cols-[80px_1fr] items-start gap-2 text-xs">
+              <span className="font-semibold uppercase tracking-wide text-slate-400">
+                {item.label}
               </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Summary content */}
-      <div className="flex min-h-0 flex-1 flex-col px-5 pt-4 pb-3">
-        <p className="mb-3 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Summary
-        </p>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {summary ? (
-            <p className="text-sm leading-7 text-slate-700">{summary}</p>
-          ) : isSummarizing ? (
-            <p className="text-sm italic text-slate-400">Generating summary…</p>
-          ) : null}
+              <span className="text-slate-600">{item.value}</span>
+            </div>
+          ))}
         </div>
       </div>
+
+      {hasSummaryContent && (
+        <div className="flex min-h-0 flex-1 flex-col px-5 pt-4 pb-3">
+          {summary && (
+            <p className="mb-3 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Summary
+            </p>
+          )}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {summary ? (
+              <p className="text-sm leading-7 text-slate-700">{summary}</p>
+            ) : isSummarizing ? (
+              <p className="text-sm italic text-slate-400">Generating summary…</p>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {/* Action row */}
       <div className="shrink-0 border-t border-slate-100 px-5 py-3 flex items-center justify-end gap-2">

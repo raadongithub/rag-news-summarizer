@@ -15,6 +15,8 @@ interface ArticleTextPanelProps {
    * The parent is responsible for persisting the dismissal.
    */
   onDismissOnboarding?: () => void;
+  /** Called when the user wants to open the full-screen expanded canvas. */
+  onExpand?: () => void;
 }
 
 /**
@@ -34,11 +36,14 @@ interface ArticleTextPanelProps {
  *     When true the panel is forced open and an onboarding callout is shown.
  * onDismissOnboarding : function, optional
  *     Callback invoked when the user closes the onboarding callout.
+ * onExpand : function, optional
+ *     Callback invoked when the user opens the expanded canvas view.
  */
 export default function ArticleTextPanel({
   content,
   showOnboardingTip = false,
   onDismissOnboarding,
+  onExpand,
 }: ArticleTextPanelProps) {
   const [open, setOpen] = useState(showOnboardingTip);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -71,7 +76,7 @@ export default function ArticleTextPanel({
   return (
     <div
       ref={panelRef}
-      className={`fixed left-0 top-1/2 z-40 flex -translate-y-1/2 items-stretch transition-transform duration-300 ease-out ${
+      className={`fixed left-0 top-1/2 z-20 flex -translate-y-1/2 items-stretch transition-transform duration-300 ease-out ${
         open ? "translate-x-0" : "-translate-x-80"
       }`}
     >
@@ -79,11 +84,22 @@ export default function ArticleTextPanel({
       <div className="flex h-[70vh] w-80 flex-col overflow-hidden rounded-r-[1.75rem] border border-white/70 bg-white/95 shadow-[0_16px_50px_-20px_rgba(15,23,42,0.45)] backdrop-blur">
         {/* Header */}
         <div className="shrink-0 border-b border-slate-100 px-5 py-4">
-          <div className="flex items-center gap-2">
-            <ArticleIcon />
-            <span className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-              Full Article Text
-            </span>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <ArticleIcon />
+              <span className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                Full Article Text
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onExpand}
+              className="btn-ghost px-2.5 py-1.5 text-xs"
+              title="Open expanded canvas"
+              aria-label="Open expanded canvas"
+            >
+              Expand
+            </button>
           </div>
         </div>
 
