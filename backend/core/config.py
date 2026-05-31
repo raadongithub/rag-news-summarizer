@@ -111,7 +111,7 @@ class RetrievalConfig:
     default_top_k: int = 3
     candidate_multiplier: int = 4
     contextual_window: int = 1
-    compression_enabled: bool = True
+    compression_enabled: bool = False
     compression_similarity_threshold: float = 0.2
     llm_extraction_enabled: bool = False
 
@@ -130,7 +130,7 @@ class RetrievalConfig:
             candidate_multiplier=int(os.getenv("RAG_CANDIDATE_MULTIPLIER", "4")),
             contextual_window=int(os.getenv("RAG_CONTEXTUAL_WINDOW", "1")),
             compression_enabled=os.getenv(
-                "RAG_CONTEXTUAL_COMPRESSION_ENABLED", "true"
+                "RAG_CONTEXTUAL_COMPRESSION_ENABLED", "false"
             ).lower() in {"1", "true", "yes", "on"},
             compression_similarity_threshold=float(
                 os.getenv("RAG_COMPRESSION_SIMILARITY_THRESHOLD", "0.2")

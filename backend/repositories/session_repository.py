@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from ..models import SessionRecord
 
@@ -118,10 +119,13 @@ class SessionRepository:
         for key, value in fields.items():
             if key == "article":
                 record.article_json = value
+                flag_modified(record, "article_json")
             elif key == "chat_history":
                 record.chat_history_json = value
+                flag_modified(record, "chat_history_json")
             elif key == "retrieved_passages":
                 record.retrieved_passages_json = value
+                flag_modified(record, "retrieved_passages_json")
             else:
                 setattr(record, key, value)
         self.db_session.add(record)

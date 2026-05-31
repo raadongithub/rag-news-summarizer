@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import type { ChatMessage, Critique, Passage } from "@/lib/api";
 
@@ -44,14 +46,18 @@ export default function ChatPanel({
           <ChatEmptyState articleLoaded={articleLoaded} />
         )}
 
-        {messages.map((message, index) => (
-          <MessageBubble
-            key={`${message.role}-${index}`}
-            index={index}
-            message={message}
-            onExpand={() => onExpandMessage(message, index)}
-          />
-        ))}
+        {messages.map((message, index) => {
+          // Don't render the streaming placeholder bubble until content arrives
+          if (message.role === "assistant" && !message.content) return null;
+          return (
+            <MessageBubble
+              key={`${message.role}-${index}`}
+              index={index}
+              message={message}
+              onExpand={() => onExpandMessage(message, index)}
+            />
+          );
+        })}
 
         {isThinking && (
           <div className="flex justify-start">
@@ -64,14 +70,14 @@ export default function ChatPanel({
         <div ref={bottomRef} />
       </div>
 
-      <form className="mt-3 flex gap-2 border-t border-slate-200 pt-3" onSubmit={handleSubmit}>
+      <form className="mt-3 flex justify-center gap-2 border-t border-slate-200 pt-3" onSubmit={handleSubmit}>
         <input
           type="text"
           value={input}
           onChange={(event) => setInput(event.target.value)}
           placeholder={disabled ? "Load an article first..." : "Ask a question..."}
           disabled={disabled || isThinking}
-          className="flex-1 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100 placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
+          className="w-[60%] rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100 placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
         />
         <button
           type="submit"
@@ -181,24 +187,39 @@ function MessageBubble({ message, onExpand, index }: MessageBubbleProps) {
               : "rounded-tl-sm border border-slate-200 bg-white text-slate-800 shadow-sm"
           }`}
         >
-          {message.content}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button className="btn-ghost" onClick={onExpand} type="button">
-            {isUser ? `Open prompt ${index + 1}` : `Open answer ${index + 1}`}
-          </button>
-
-          {!isUser && message.critique && (
-            <button
-              className="text-xs text-sky-700 transition hover:text-sky-900"
-              onClick={() => setDetailsExpanded((value) => !value)}
-              type="button"
+          {isUser ? (
+            message.content
+          ) : (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-1 last:mb-0">{children}</ul>,
+                ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-1 last:mb-0">{children}</ol>,
+                li: ({ children }) => <li>{children}</li>,
+                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                em: ({ children }) => <em className="italic">{children}</em>,
+                code: ({ children }) => <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-700">{children}</code>,
+                h1: ({ children }) => <h1 className="mb-1 text-base font-bold">{children}</h1>,
+                h2: ({ children }) => <h2 className="mb-1 text-sm font-bold">{children}</h2>,
+                h3: ({ children }) => <h3 className="mb-1 text-sm font-semibold">{children}</h3>,
+                blockquote: ({ children }) => <blockquote className="border-l-2 border-slate-300 pl-3 italic text-slate-600">{children}</blockquote>,
+              }}
             >
-              {detailsExpanded ? "Hide details" : "Show details"}
-            </button>
+              {message.content}
+            </ReactMarkdown>
           )}
         </div>
+
+        {!isUser && message.critique && (
+          <button
+            className="text-xs text-sky-700 transition hover:text-sky-900"
+            onClick={() => setDetailsExpanded((value) => !value)}
+            type="button"
+          >
+            {detailsExpanded ? "Hide details" : "Show details"}
+          </button>
+        )}
 
         {!isUser && message.critique && detailsExpanded && (
           <CritiqueDetails critique={message.critique} passages={message.passages} />
@@ -219,12 +240,16 @@ function CritiqueDetails({
     <div className="card space-y-3 p-4 text-xs text-slate-600">
       <div>
         <p className="font-medium text-slate-700">Relevance justification</p>
-        <p className="mt-1 leading-6">{critique.relevance_explanation}</p>
+        <div className="mt-1 leading-6">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{critique.relevance_explanation}</ReactMarkdown>
+        </div>
       </div>
 
       <div>
         <p className="font-medium text-slate-700">Faithfulness justification</p>
-        <p className="mt-1 leading-6">{critique.faithfulness_explanation}</p>
+        <div className="mt-1 leading-6">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{critique.faithfulness_explanation}</ReactMarkdown>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">

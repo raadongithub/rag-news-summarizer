@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import time
+import uuid
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -11,6 +14,7 @@ from sqlalchemy.orm import Session
 from ..core.config import AppConfig, get_settings
 from ..core.exceptions import NotFoundError, ValidationError
 from ..models import User
+from ..models.chat import ChatMessage, MessageCritique, MessagePassage
 from ..repositories import SessionRepository
 from .article_service import ArticleService
 from .chat_service import ChatService
@@ -314,8 +318,10 @@ class SessionService:
             raise ValidationError("No article loaded in this session")
 
         history: list[dict[str, Any]] = list(record.chat_history_json or [])
+        message_id = str(uuid.uuid4())
+        user_message_index = len(history)
         history.append(
-            {"role": "user", "content": question, "critique": None, "passages": []}
+            {"role": "user", "content": question, "critique": None, "passages": [], "message_id": message_id}
         )
         self.session_repository.update(
             record,
@@ -324,6 +330,18 @@ class SessionService:
             error_message=None,
         )
         self.db_session.commit()
+
+        logger.info(
+            "%s",
+            json.dumps({
+                "event": "query_sent",
+                "session_id": session_id,
+                "message_id": message_id,
+                "message_index": user_message_index,
+                "query": question,
+            }),
+        )
+        query_start = time.monotonic()
 
         try:
             pipeline_result = await self.chat_service.answer_question(
@@ -366,6 +384,7 @@ class SessionService:
                 "content": answer,
                 "critique": critique,
                 "passages": passages,
+                "message_id": message_id,
             }
             history.append(assistant_message)
             self.session_repository.update(
@@ -376,6 +395,67 @@ class SessionService:
                 error_message=None,
             )
             self.db_session.commit()
+
+            # Persist to normalized tables (3NF)
+            user_msg_row = ChatMessage(
+                id=message_id,
+                session_id=session_id,
+                role="user",
+                content=question,
+                message_index=user_message_index,
+            )
+            self.db_session.add(user_msg_row)
+            assistant_msg_id = str(uuid.uuid4())
+            assistant_msg_row = ChatMessage(
+                id=assistant_msg_id,
+                session_id=session_id,
+                role="assistant",
+                content=answer,
+                message_index=user_message_index + 1,
+            )
+            self.db_session.add(assistant_msg_row)
+            if critique:
+                self.db_session.add(MessageCritique(
+                    message_id=assistant_msg_id,
+                    is_faithful=critique.get("is_faithful", False),
+                    faithfulness_explanation=critique.get("faithfulness_explanation", ""),
+                    is_relevant=critique.get("is_relevant", False),
+                    relevance_explanation=critique.get("relevance_explanation", ""),
+                    confidence_score=critique.get("confidence_score", 0.0),
+                ))
+            for passage in passages:
+                meta = passage.get("metadata") or {}
+                self.db_session.add(MessagePassage(
+                    message_id=assistant_msg_id,
+                    rank=passage.get("rank", 0),
+                    text=passage.get("text", ""),
+                    similarity_score=passage.get("similarity_score", 0.0),
+                    base_similarity_score=meta.get("base_similarity_score"),
+                    chunk_id=str(meta.get("chunk_id", "") or "")[:128] or None,
+                    article_url=meta.get("article_url"),
+                    title=meta.get("title"),
+                    chunk_index=meta.get("chunk_index"),
+                ))
+            self.db_session.commit()
+
+            elapsed_ms = round((time.monotonic() - query_start) * 1000, 1)
+            logger.info(
+                "%s",
+                json.dumps({
+                    "event": "response_received",
+                    "session_id": session_id,
+                    "message_id": message_id,
+                    "message_index": user_message_index + 1,
+                    "answer": answer,
+                    "passages_count": len(passages),
+                    "retrieved_chunks": [
+                        {"rank": p.get("rank"), "text": p.get("text", "")[:120], "similarity_score": p.get("similarity_score")}
+                        for p in passages
+                    ],
+                    "critique": critique,
+                    "elapsed_ms": elapsed_ms,
+                }),
+            )
             logger.info("Chat turn complete")
             return {"answer": answer, "critique": critique, "passages": passages}
         except Exception as exc:

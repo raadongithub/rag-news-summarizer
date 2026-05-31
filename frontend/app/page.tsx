@@ -174,6 +174,8 @@ export default function Home() {
     try {
       const updatedSession = await api.loadArticle(session.id, url);
       setSession(updatedSession);
+      setArticleReadyToast(true);
+      setTimeout(() => setArticleReadyToast(false), 3500);
     } catch (error) {
       if (handleUnauthorized(error, "Please sign in again to continue.")) return;
       const message = error instanceof Error ? error.message : String(error);
@@ -386,6 +388,7 @@ export default function Home() {
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [leftPanelWidth, setLeftPanelWidth] = useState(320);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [articleReadyToast, setArticleReadyToast] = useState(false);
   const isProcessing = loadingArticle || summarizing || thinking;
 
   const expandedArticle =
@@ -561,6 +564,12 @@ export default function Home() {
             style={{ width: leftPanelOpen ? leftPanelWidth : 0 }}
           >
             <div className="flex h-full flex-col gap-4 p-4">
+              {/* Article-ready toast */}
+              {articleReadyToast && (
+                <div className="shrink-0 animate-pulse rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-sm">
+                  ✓ Article loaded — ready to discuss!
+                </div>
+              )}
               {/*
                * Article URL loader — only shown before an article is attached.
                * Once a session has an article the form is intentionally hidden:

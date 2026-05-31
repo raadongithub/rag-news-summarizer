@@ -8,8 +8,12 @@ from typing import Any
 from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
+from typing import TYPE_CHECKING
 
 from ..db.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from .chat import ChatMessage
 
 
 class SessionRecord(Base, TimestampMixin):
@@ -37,3 +41,6 @@ class SessionRecord(Base, TimestampMixin):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user = relationship("User", back_populates="sessions")
+    chat_messages: Mapped[list["ChatMessage"]] = relationship(
+        "ChatMessage", back_populates="session", order_by="ChatMessage.message_index", cascade="all, delete-orphan"
+    )

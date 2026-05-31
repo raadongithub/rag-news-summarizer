@@ -58,7 +58,7 @@ class SummaryGenerator:
                 (
                     "system",
                     """
-                    You are an expert AI news summarizer. Your task is to provide a concise, single-sentence summary that directly answers the user's question based only on the provided text context. Do not add any introductory phrases and only focus on answering the query.
+                    You are an expert AI news summarizer. Answer the user's question based only on the provided text context. Structure your response using Markdown: use **bold** for key terms. Do not add introductory phrases — go straight to the answer.
                     """,
                 ),
                 (
@@ -197,6 +197,8 @@ class SelfCritique:
         Critically assess the summary on two dimensions:
         1. **Faithfulness** - Is every claim in the summary directly supported by the source context? Flag any hallucinations or unsupported extrapolations.
         2. **Relevance** - Does the summary directly and completely answer the user's question? Penalise vague or off-topic answers.
+
+        Write `faithfulness_explanation` and `relevance_explanation` in Markdown format. Use **bold** for key claims.
 
         For **confidence_score** (0.0-1.0), reason carefully about your own certainty:
         - Use high scores (0.85-1.0) only when the source context is unambiguous, the summary is clearly grounded, and you have no doubts.
