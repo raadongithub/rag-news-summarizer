@@ -9,7 +9,7 @@ from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
-from ..db.base import Base, TimestampMixin
+from ..database.base import Base, TimestampMixin
 
 
 class ChatMessage(Base, TimestampMixin):

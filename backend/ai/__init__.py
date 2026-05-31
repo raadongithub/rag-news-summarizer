@@ -1,9 +1,4 @@
-"""AI pipeline package for scraping, retrieval, and summarization.
-
-Notes
------
-Exports the core package surface used by the Streamlit app and CLI pipeline.
-"""
+"""AI pipeline package for scraping, retrieval, and summarization."""
 
 from .rag_pipeline import RagPipeline, RagPipelineResult
 from .retriever import ContextRetriever

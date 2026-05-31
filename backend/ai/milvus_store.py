@@ -19,15 +19,7 @@ PRIMARY_KEY_FIELD = "chunk_id"
 
 
 class MilvusChunkStore:
-    """Persistent chunk storage and search service backed by Milvus.
-
-    Parameters
-    ----------
-    embeddings : VoyageEmbeddingService
-        Shared embedding service used for ingestion and query embedding.
-    config : MilvusConfig or None, optional
-        Milvus storage configuration.
-    """
+    """Persistent chunk storage and search service backed by Milvus."""
 
     def __init__(
         self,
@@ -48,24 +40,14 @@ class MilvusChunkStore:
         self._embedding_dimension: int | None = self.embeddings.config.output_dimension
 
     async def initialize(self) -> None:
-        """Connect to Milvus and ensure the collection is ready.
-
-        Returns
-        -------
-        None
-        """
+        """Connect to Milvus and ensure the collection is ready."""
         if self._collection_ready:
             return
         await self._ensure_collection()
         self._collection_ready = True
 
     async def close(self) -> None:
-        """Close the underlying Milvus connections.
-
-        Returns
-        -------
-        None
-        """
+        """Close the underlying Milvus connections."""
         await self._async_client.close()
         if hasattr(self._sync_client, "close"):
             self._sync_client.close()
@@ -74,18 +56,7 @@ class MilvusChunkStore:
         self,
         chunk_records: Sequence[ChunkRecord],
     ) -> Dict[str, int]:
-        """Insert or update a set of deterministic chunk records.
-
-        Parameters
-        ----------
-        chunk_records : sequence of ChunkRecord
-            Chunk records to persist.
-
-        Returns
-        -------
-        dict of str to int
-            Ingestion statistics including inserted and deleted chunk counts.
-        """
+        """Insert or update a set of deterministic chunk records."""
         await self.initialize()
         if not chunk_records:
             return {"inserted": 0, "deleted": 0, "total": 0}
@@ -170,26 +141,7 @@ class MilvusChunkStore:
         chunk_size: int,
         chunk_overlap: int,
     ) -> List[Dict[str, Any]]:
-        """Search article chunks using a query embedding.
-
-        Parameters
-        ----------
-        article_url : str
-            Source article URL to filter on.
-        query : str
-            User query.
-        k : int
-            Maximum number of chunks to return.
-        chunk_size : int
-            Configured chunk size.
-        chunk_overlap : int
-            Configured chunk overlap.
-
-        Returns
-        -------
-        list of dict of str to Any
-            Raw Milvus search hits normalized for downstream retrieval logic.
-        """
+        """Search article chunks using a query embedding."""
         await self.initialize()
         query_vector = await self.embeddings.aembed_query(query)
         await self._ensure_embedding_dimension(query_vector)
@@ -233,24 +185,7 @@ class MilvusChunkStore:
         chunk_size: int,
         chunk_overlap: int,
     ) -> List[Dict[str, Any]]:
-        """Fetch chunk rows by article and chunk index.
-
-        Parameters
-        ----------
-        article_url : str
-            Source article URL.
-        neighbor_indices : iterable of int
-            Chunk indices to load.
-        chunk_size : int
-            Configured chunk size.
-        chunk_overlap : int
-            Configured chunk overlap.
-
-        Returns
-        -------
-        list of dict of str to Any
-            Matching chunk rows.
-        """
+        """Fetch chunk rows by article and chunk index."""
         indices = sorted(set(neighbor_indices))
         if not indices:
             return []
@@ -284,22 +219,7 @@ class MilvusChunkStore:
         chunk_size: int,
         chunk_overlap: int,
     ) -> int:
-        """Count indexed chunks for a specific article configuration.
-
-        Parameters
-        ----------
-        article_url : str
-            Source article URL.
-        chunk_size : int
-            Configured chunk size.
-        chunk_overlap : int
-            Configured chunk overlap.
-
-        Returns
-        -------
-        int
-            Number of matching chunks.
-        """
+        """Count indexed chunks for a specific article configuration."""
         rows = await self._query_rows(
             filter_=self._article_filter(
                 article_url=article_url,
@@ -313,12 +233,7 @@ class MilvusChunkStore:
         return int(rows[0].get("count(*)", 0))
 
     async def _ensure_collection(self) -> None:
-        """Create and load the Milvus collection when missing.
-
-        Returns
-        -------
-        None
-        """
+        """Create and load the Milvus collection when missing."""
         collection_exists = await asyncio.to_thread(
             self._sync_client.has_collection,
             self.config.collection_name,
@@ -413,20 +328,7 @@ class MilvusChunkStore:
         filter_: str,
         output_fields: List[str],
     ) -> List[Dict[str, Any]]:
-        """Query rows from Milvus with retry handling.
-
-        Parameters
-        ----------
-        filter_ : str
-            Milvus filter expression.
-        output_fields : list of str
-            Fields to return.
-
-        Returns
-        -------
-        list of dict of str to Any
-            Query rows.
-        """
+        """Query rows from Milvus with retry handling."""
         rows = await self._run_with_retry(
             "query_rows",
             self._async_client.query,
@@ -437,17 +339,7 @@ class MilvusChunkStore:
         return [dict(row) for row in rows]
 
     async def _delete_by_ids(self, chunk_ids: Sequence[str]) -> None:
-        """Delete chunk rows by primary key.
-
-        Parameters
-        ----------
-        chunk_ids : sequence of str
-            Primary keys to delete.
-
-        Returns
-        -------
-        None
-        """
+        """Delete chunk rows by primary key."""
         if not chunk_ids:
             return
         quoted_ids = ", ".join(self._quote(value) for value in chunk_ids)
@@ -459,22 +351,7 @@ class MilvusChunkStore:
         )
 
     async def _ensure_embedding_dimension(self, vector: Sequence[float]) -> None:
-        """Record and validate the active embedding dimension.
-
-        Parameters
-        ----------
-        vector : sequence of float
-            Example embedding vector.
-
-        Returns
-        -------
-        None
-
-        Raises
-        ------
-        ValueError
-            Raised when the runtime embedding dimension changes unexpectedly.
-        """
+        """Record and validate the active embedding dimension."""
         vector_dimension = len(vector)
         if self._embedding_dimension is None:
             self._embedding_dimension = vector_dimension
@@ -486,29 +363,7 @@ class MilvusChunkStore:
             )
 
     async def _run_with_retry(self, operation_name: str, func: Any, *args: Any, **kwargs: Any) -> Any:
-        """Run a Milvus operation with bounded retries.
-
-        Parameters
-        ----------
-        operation_name : str
-            Human-readable operation name used in logs.
-        func : Any
-            Awaitable Milvus client method.
-        *args : Any
-            Positional arguments passed to the method.
-        **kwargs : Any
-            Keyword arguments passed to the method.
-
-        Returns
-        -------
-        Any
-            Operation result.
-
-        Raises
-        ------
-        Exception
-            Re-raises the last operation error after all retries fail.
-        """
+        """Run a Milvus operation with bounded retries."""
         last_error: Exception | None = None
         for attempt in range(1, self.config.retry_attempts + 1):
             try:
@@ -533,18 +388,7 @@ class MilvusChunkStore:
 
     @staticmethod
     def _quote(value: str) -> str:
-        """Escape a string for use in a Milvus filter expression.
-
-        Parameters
-        ----------
-        value : str
-            Raw string value.
-
-        Returns
-        -------
-        str
-            Quoted and escaped value.
-        """
+        """Escape a string for use in a Milvus filter expression."""
         return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
     def _article_filter(
@@ -554,22 +398,7 @@ class MilvusChunkStore:
         chunk_size: int,
         chunk_overlap: int,
     ) -> str:
-        """Build a deterministic Milvus filter for an article chunk set.
-
-        Parameters
-        ----------
-        article_url : str
-            Source article URL.
-        chunk_size : int
-            Configured chunk size.
-        chunk_overlap : int
-            Configured chunk overlap.
-
-        Returns
-        -------
-        str
-            Milvus filter expression.
-        """
+        """Build a deterministic Milvus filter for an article chunk set."""
         return (
             f'article_url == {self._quote(article_url)} '
             f"and chunk_size == {chunk_size} "
@@ -578,18 +407,7 @@ class MilvusChunkStore:
 
     @staticmethod
     def _normalize_search_results(results: Any) -> List[Dict[str, Any]]:
-        """Normalize heterogeneous Milvus search responses.
-
-        Parameters
-        ----------
-        results : Any
-            Raw response returned by `AsyncMilvusClient.search`.
-
-        Returns
-        -------
-        list of dict of str to Any
-            Flat list of normalized hits.
-        """
+        """Normalize heterogeneous Milvus search responses."""
         if not results:
             return []
 

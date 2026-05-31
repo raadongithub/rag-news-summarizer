@@ -22,21 +22,7 @@ NO_CONTEXT_ANSWER = (
 
 
 class RetrievedPassage(BaseModel):
-    """Normalized retrieved passage returned by the ranking stage.
-
-    Attributes
-    ----------
-    text : str
-        Retrieved article chunk content.
-    similarity_score : float
-        Final semantic score assigned during reranking.
-    rank : int
-        One-based ranking position in the final retrieval result set.
-    metadata : dict of str to Any
-        Retrieval metadata persisted with the chunk.
-    base_similarity_score : float or None
-        Original vector-search score returned by Milvus before reranking.
-    """
+    """Normalized retrieved passage returned by the ranking stage."""
 
     text: str
     similarity_score: float
@@ -46,45 +32,7 @@ class RetrievedPassage(BaseModel):
 
 
 class RetrievalDiagnostics(BaseModel):
-    """Operational metadata captured for the retrieval stage.
-
-    Attributes
-    ----------
-    url : str
-        Article URL associated with the retrieval request.
-    title : str
-        Article title associated with the retrieval request.
-    total_chunks : int
-        Total number of chunks produced before ranking.
-    retrieval_method : str
-        Retrieval implementation identifier.
-    chunk_size : int
-        Number of sentences per chunk window.
-    chunk_overlap : int
-        Number of overlapping sentences between adjacent chunks.
-    requested_k : int
-        Number of passages requested by the caller.
-    returned_k : int
-        Number of passages actually returned.
-    elapsed_ms : float
-        Retrieval latency in milliseconds.
-    similarity_max : float or None
-        Highest similarity score in the returned set.
-    similarity_min : float or None
-        Lowest similarity score in the returned set.
-    similarity_mean : float or None
-        Mean similarity score in the returned set.
-    candidate_k : int
-        Candidate pool size requested from Milvus before compression.
-    compression_enabled : bool
-        Whether contextual compression was enabled.
-    llm_extraction_enabled : bool
-        Whether LLM-based extraction ran during retrieval.
-    inserted_chunks : int
-        Number of newly inserted chunks during ingestion.
-    ingested_chunks : int
-        Total chunks seen for the article during ingestion.
-    """
+    """Operational metadata captured for the retrieval stage."""
 
     url: str = ""
     title: str = ""
@@ -106,40 +54,14 @@ class RetrievalDiagnostics(BaseModel):
 
 
 class GenerationDiagnostics(BaseModel):
-    """Operational metadata captured for the generation stage.
-
-    Attributes
-    ----------
-    model : str
-        Model identifier used for answer generation.
-    elapsed_ms : float
-        Generation latency in milliseconds.
-    """
+    """Operational metadata captured for the generation stage."""
 
     model: str = DEFAULT_ANTHROPIC_MODEL
     elapsed_ms: float = 0.0
 
 
 class RagPipelineResult(BaseModel):
-    """Structured output from a full RAG question-answer turn.
-
-    Attributes
-    ----------
-    query : str
-        User question processed by the pipeline.
-    answer : str
-        Final answer returned by the generation stage or fallback path.
-    retrieved_passages : list of RetrievedPassage
-        Ranked passages used as generation context.
-    retrieval : RetrievalDiagnostics
-        Retrieval diagnostics captured for the request.
-    generation : GenerationDiagnostics or None
-        Generation diagnostics when an answer was generated from retrieved context.
-    total_elapsed_ms : float
-        End-to-end pipeline latency in milliseconds.
-    used_fallback_answer : bool
-        Indicates whether the pipeline returned the no-context fallback response.
-    """
+    """Structured output from a full RAG question-answer turn."""
 
     query: str
     answer: str
@@ -151,19 +73,7 @@ class RagPipelineResult(BaseModel):
 
 
 class RagPipeline:
-    """Run retrieval and generation while capturing reusable diagnostics.
-
-    Parameters
-    ----------
-    voyage_api_key : str
-        Voyage API key used for embedding and retrieval.
-    anthropic_api_key : str or None, optional
-        Anthropic API key used for answer generation.
-    chunk_store : MilvusChunkStore or None, optional
-        Shared Milvus store instance.
-    embeddings : VoyageEmbeddingService or None, optional
-        Shared embedding service instance.
-    """
+    """Run retrieval and generation while capturing reusable diagnostics."""
 
     def __init__(
         self,
@@ -190,26 +100,7 @@ class RagPipeline:
         chunk_size: int = 3,
         chunk_overlap: int = 1,
     ) -> RagPipelineResult:
-        """Answer a question from an article without blocking the event loop.
-
-        Parameters
-        ----------
-        article : dict of str to Any
-            Serialized article payload containing at least article content.
-        query : str
-            User question to answer.
-        k : int, optional
-            Maximum number of ranked passages to return.
-        chunk_size : int, optional
-            Number of sentences in each retrieval chunk.
-        chunk_overlap : int, optional
-            Number of overlapping sentences between adjacent chunks.
-
-        Returns
-        -------
-        RagPipelineResult
-            Structured answer payload with passages, diagnostics, and latency.
-        """
+        """Answer a question from an article without blocking the event loop."""
         total_started = perf_counter()
 
         retrieval_started = perf_counter()
@@ -272,26 +163,7 @@ class RagPipeline:
         chunk_size: int = 3,
         chunk_overlap: int = 1,
     ) -> RagPipelineResult:
-        """Answer a question from an article synchronously.
-
-        Parameters
-        ----------
-        article : dict of str to Any
-            Serialized article payload containing at least article content.
-        query : str
-            User question to answer.
-        k : int, optional
-            Maximum number of ranked passages to return.
-        chunk_size : int, optional
-            Number of sentences in each retrieval chunk.
-        chunk_overlap : int, optional
-            Number of overlapping sentences between adjacent chunks.
-
-        Returns
-        -------
-        RagPipelineResult
-            Structured answer payload with passages, diagnostics, and latency.
-        """
+        """Answer a question from an article synchronously."""
         return asyncio.run(
             self.answer_question_async(
                 article=article,
@@ -312,28 +184,7 @@ class RagPipeline:
         chunk_overlap: int,
         elapsed_ms: float,
     ) -> RetrievalDiagnostics:
-        """Build normalized retrieval diagnostics from raw retrieval metadata.
-
-        Parameters
-        ----------
-        metadata : dict of str to Any
-            Raw metadata returned by the retriever.
-        passages : list of RetrievedPassage
-            Ranked passages returned by retrieval.
-        requested_k : int
-            Number of passages requested by the caller.
-        chunk_size : int
-            Number of sentences in each retrieval chunk.
-        chunk_overlap : int
-            Number of overlapping sentences between adjacent chunks.
-        elapsed_ms : float
-            Measured retrieval latency in milliseconds.
-
-        Returns
-        -------
-        RetrievalDiagnostics
-            Aggregated retrieval diagnostics suitable for logging and evaluation.
-        """
+        """Build normalized retrieval diagnostics from raw retrieval metadata."""
         scores = [passage.similarity_score for passage in passages]
         similarity_mean = sum(scores) / len(scores) if scores else None
 

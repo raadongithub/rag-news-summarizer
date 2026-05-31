@@ -14,18 +14,7 @@ _SESSION_FACTORY: sessionmaker[Session] | None = None
 
 
 def get_engine(settings: AppConfig | None = None):
-    """Return the shared SQLAlchemy engine.
-
-    Parameters
-    ----------
-    settings : AppConfig | None, optional
-        Optional settings override.
-
-    Returns
-    -------
-    Engine
-        Shared SQLAlchemy engine instance.
-    """
+    """Return the shared SQLAlchemy engine."""
 
     global _ENGINE
     if _ENGINE is None:
@@ -38,18 +27,7 @@ def get_engine(settings: AppConfig | None = None):
 
 
 def get_session_factory(settings: AppConfig | None = None) -> sessionmaker[Session]:
-    """Return the shared SQLAlchemy session factory.
-
-    Parameters
-    ----------
-    settings : AppConfig | None, optional
-        Optional settings override.
-
-    Returns
-    -------
-    sessionmaker[Session]
-        Configured session factory.
-    """
+    """Return the shared SQLAlchemy session factory."""
 
     global _SESSION_FACTORY
     if _SESSION_FACTORY is None:
@@ -64,13 +42,7 @@ def get_session_factory(settings: AppConfig | None = None) -> sessionmaker[Sessi
 
 
 def get_db_session() -> Generator[Session, None, None]:
-    """Yield a request-scoped SQLAlchemy session.
-
-    Yields
-    ------
-    Session
-        Open database session for the current request.
-    """
+    """Yield a request-scoped SQLAlchemy session."""
 
     session = get_session_factory()()
     try:

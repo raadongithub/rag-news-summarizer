@@ -7,7 +7,7 @@ import uuid
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..db.base import Base, TimestampMixin
+from ..database.base import Base, TimestampMixin
 
 
 class User(Base, TimestampMixin):

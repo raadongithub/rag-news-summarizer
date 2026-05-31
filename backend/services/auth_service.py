@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..core.config import AppConfig, get_settings
 from ..core.exceptions import AuthenticationError, ConflictError, ValidationError
 from ..core.security import create_access_token, hash_password, verify_password
-from ..repositories import UserRepository
+from ..queries import UserQueries
 from .serializers import serialize_user
 
 
@@ -19,39 +19,16 @@ class AuthService:
         self,
         db_session: Session,
         settings: AppConfig | None = None,
-        user_repository: UserRepository | None = None,
+        user_repository: UserQueries | None = None,
     ) -> None:
-        """Initialize the auth service.
-
-        Parameters
-        ----------
-        db_session : Session
-            Active SQLAlchemy session.
-        settings : AppConfig | None, optional
-            Optional settings override.
-        user_repository : UserRepository | None, optional
-            Optional repository override.
-        """
+        """Initialize the auth service."""
 
         self.db_session = db_session
         self.settings = settings or get_settings()
-        self.user_repository = user_repository or UserRepository(db_session)
+        self.user_repository = user_repository or UserQueries(db_session)
 
     def register(self, email: str, password: str) -> dict[str, object]:
-        """Create a new user and issue an access token.
-
-        Parameters
-        ----------
-        email : str
-            User email address.
-        password : str
-            Plaintext password.
-
-        Returns
-        -------
-        dict[str, object]
-            Auth response payload.
-        """
+        """Create a new user and issue an access token."""
 
         normalized_email = email.strip().lower()
         if len(password) < self.settings.min_password_length:
@@ -84,20 +61,7 @@ class AuthService:
         }
 
     def login(self, email: str, password: str) -> dict[str, object]:
-        """Authenticate a user and issue an access token.
-
-        Parameters
-        ----------
-        email : str
-            User email address.
-        password : str
-            Plaintext password.
-
-        Returns
-        -------
-        dict[str, object]
-            Auth response payload.
-        """
+        """Authenticate a user and issue an access token."""
 
         normalized_email = email.strip().lower()
         user = self.user_repository.get_by_email(normalized_email)

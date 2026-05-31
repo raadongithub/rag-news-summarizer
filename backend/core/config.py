@@ -16,13 +16,7 @@ ENV_FILE = REPO_ROOT / ".env"
 
 
 def load_environment() -> None:
-    """Load environment variables from the repository `.env` file.
-
-    Returns
-    -------
-    None
-        This function mutates process environment variables in place.
-    """
+    """Load environment variables from the repository `.env` file."""
 
     load_dotenv(ENV_FILE, override=False)
 
@@ -38,13 +32,7 @@ class EmbeddingConfig:
 
     @classmethod
     def from_env(cls) -> "EmbeddingConfig":
-        """Build embedding settings from environment variables.
-
-        Returns
-        -------
-        EmbeddingConfig
-            Parsed embedding configuration.
-        """
+        """Build embedding settings from environment variables."""
 
         raw_dim = os.getenv("VOYAGE_EMBEDDING_DIMENSION", "").strip()
         return cls(
@@ -76,13 +64,7 @@ class MilvusConfig:
 
     @classmethod
     def from_env(cls) -> "MilvusConfig":
-        """Build Milvus settings from environment variables.
-
-        Returns
-        -------
-        MilvusConfig
-            Parsed Milvus configuration.
-        """
+        """Build Milvus settings from environment variables."""
 
         def _json(name: str, default: dict[str, Any]) -> dict[str, Any]:
             raw = os.getenv(name, "").strip()
@@ -117,13 +99,7 @@ class RetrievalConfig:
 
     @classmethod
     def from_env(cls) -> "RetrievalConfig":
-        """Build retrieval settings from environment variables.
-
-        Returns
-        -------
-        RetrievalConfig
-            Parsed retrieval configuration.
-        """
+        """Build retrieval settings from environment variables."""
 
         return cls(
             default_top_k=int(os.getenv("RAG_TOP_K", "3")),
@@ -172,13 +148,7 @@ class AppConfig:
 
     @classmethod
     def from_env(cls) -> "AppConfig":
-        """Build the application configuration from environment variables.
-
-        Returns
-        -------
-        AppConfig
-            Parsed application configuration.
-        """
+        """Build the application configuration from environment variables."""
 
         load_environment()
 
@@ -227,13 +197,7 @@ class AppConfig:
 
 @lru_cache(maxsize=1)
 def get_settings() -> AppConfig:
-    """Return cached application settings.
-
-    Returns
-    -------
-    AppConfig
-        Singleton settings object for the current process.
-    """
+    """Return cached application settings."""
 
     return AppConfig.from_env()
 

@@ -10,25 +10,7 @@ from typing import Any, Dict, List
 
 @dataclass(frozen=True)
 class ChunkRecord:
-    """Normalized article chunk prepared for storage and retrieval.
-
-    Parameters
-    ----------
-    chunk_id : str
-        Deterministic identifier for the chunk.
-    article_url : str
-        Source article URL.
-    title : str
-        Source article title.
-    chunk_index : int
-        Zero-based chunk position.
-    chunk_text : str
-        Raw chunk content returned to downstream consumers.
-    contextualized_text : str
-        Enriched chunk text used for embedding and retrieval.
-    metadata : dict of str to Any
-        Chunk metadata persisted alongside the vector.
-    """
+    """Normalized article chunk prepared for storage and retrieval."""
 
     chunk_id: str
     article_url: str
@@ -50,27 +32,7 @@ class ArticleChunker:
         chunk_size: int = 5,
         chunk_overlap: int = 3,
     ) -> List[str]:
-        """Split article content into overlapping sentence windows.
-
-        Parameters
-        ----------
-        content : str
-            Full article text.
-        chunk_size : int, optional
-            Number of sentences per chunk.
-        chunk_overlap : int, optional
-            Number of overlapping sentences between adjacent chunks.
-
-        Returns
-        -------
-        list of str
-            Ordered chunk texts.
-
-        Raises
-        ------
-        ValueError
-            Raised when `chunk_size` is invalid or overlap is too large.
-        """
+        """Split article content into overlapping sentence windows."""
         if chunk_size < 1:
             raise ValueError("chunk_size must be at least 1")
         if chunk_overlap < 0:
@@ -98,22 +60,7 @@ class ArticleChunker:
         chunk_size: int,
         chunk_overlap: int,
     ) -> List[ChunkRecord]:
-        """Build storage-ready chunk records for an article.
-
-        Parameters
-        ----------
-        article : dict of str to Any
-            Serialized article payload.
-        chunk_size : int
-            Number of sentences per chunk.
-        chunk_overlap : int
-            Number of overlapping sentences between adjacent chunks.
-
-        Returns
-        -------
-        list of ChunkRecord
-            Ordered records containing raw and contextualized chunk text.
-        """
+        """Build storage-ready chunk records for an article."""
         content = str(article.get("content", "")).strip()
         chunks = self.split_to_chunks(
             content=content,
@@ -183,30 +130,7 @@ class ArticleChunker:
         chunk_text: str,
         next_chunk: str,
     ) -> str:
-        """Build a retrieval-oriented contextual representation of a chunk.
-
-        Parameters
-        ----------
-        title : str
-            Article title.
-        source_domain : str
-            Article source domain.
-        publish_date : Any
-            Article publication timestamp.
-        authors : list of str
-            Article authors.
-        previous_chunk : str
-            Neighboring chunk before the current chunk.
-        chunk_text : str
-            Raw current chunk text.
-        next_chunk : str
-            Neighboring chunk after the current chunk.
-
-        Returns
-        -------
-        str
-            Enriched text optimized for semantic retrieval.
-        """
+        """Build a retrieval-oriented contextual representation of a chunk."""
         header_parts = [part for part in [title, source_domain] if part]
         if publish_date:
             header_parts.append(f"Published: {publish_date}")
@@ -232,26 +156,7 @@ class ArticleChunker:
         chunk_overlap: int,
         chunk_text: str,
     ) -> str:
-        """Build a deterministic chunk identifier.
-
-        Parameters
-        ----------
-        article_url : str
-            Source article URL.
-        chunk_index : int
-            Zero-based chunk position.
-        chunk_size : int
-            Number of sentences per chunk.
-        chunk_overlap : int
-            Number of overlapping sentences between chunks.
-        chunk_text : str
-            Raw chunk text.
-
-        Returns
-        -------
-        str
-            Stable SHA-256-based chunk identifier.
-        """
+        """Build a deterministic chunk identifier."""
         digest = hashlib.sha256(
             "||".join(
                 [

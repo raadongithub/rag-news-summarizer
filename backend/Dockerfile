@@ -141,7 +141,7 @@ COPY --from=builder /app/nltk_data /app/nltk_data
 # bind mount, which overwrites this COPY at runtime and gives you live reload.
 # This COPY is still useful for production builds where no bind mount is used.
 COPY backend/ /app/backend/
-COPY db_migrations/ /app/db_migrations/
+COPY alembic/ /app/alembic/
 COPY alembic.ini /app/alembic.ini
 
 # --- Runtime environment variables ---

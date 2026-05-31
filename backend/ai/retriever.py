@@ -34,17 +34,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class RetrievalCandidate:
-    """Intermediate retrieval candidate used before final ranking.
-
-    Parameters
-    ----------
-    document : Document
-        LangChain document carrying chunk content and metadata.
-    contextualized_text : str
-        Enriched retrieval text used for secondary ranking.
-    base_similarity : float
-        Initial Milvus similarity score.
-    """
+    """Intermediate retrieval candidate used before final ranking."""
 
     document: Document
     contextualized_text: str
@@ -52,23 +42,7 @@ class RetrievalCandidate:
 
 
 class ContextRetriever:
-    """Retrieve relevant article chunks using Milvus and contextual compression.
-
-    Parameters
-    ----------
-    voyage_api_key : str
-        API key used for Voyage embeddings.
-    anthropic_api_key : str or None, optional
-        Optional Anthropic key used for LLM-based contextual extraction.
-    chunk_store : MilvusChunkStore or None, optional
-        Reusable Milvus-backed chunk store.
-    embeddings : VoyageEmbeddingService or None, optional
-        Shared embedding service.
-    retrieval_config : RetrievalConfig or None, optional
-        Retrieval orchestration settings.
-    embedding_config : EmbeddingConfig or None, optional
-        Embedding configuration override.
-    """
+    """Retrieve relevant article chunks using Milvus and contextual compression."""
 
     def __init__(
         self,
@@ -103,22 +77,7 @@ class ContextRetriever:
         chunk_size: int = 5,
         chunk_overlap: int = 3,
     ) -> List[str]:
-        """Split article content into overlapping sentence windows.
-
-        Parameters
-        ----------
-        content : str
-            Full article text.
-        chunk_size : int, optional
-            Number of sentences per chunk.
-        chunk_overlap : int, optional
-            Number of overlapping sentences between chunks.
-
-        Returns
-        -------
-        list of str
-            Ordered chunk texts.
-        """
+        """Split article content into overlapping sentence windows."""
         return self.chunker.split_to_chunks(content, chunk_size, chunk_overlap)
 
     async def ingest_article(
@@ -128,22 +87,7 @@ class ContextRetriever:
         chunk_size: int,
         chunk_overlap: int,
     ) -> Dict[str, int]:
-        """Ensure an article is persisted to Milvus.
-
-        Parameters
-        ----------
-        article : dict of str to Any
-            Serialized article payload.
-        chunk_size : int
-            Number of sentences per chunk.
-        chunk_overlap : int
-            Number of overlapping sentences between chunks.
-
-        Returns
-        -------
-        dict of str to int
-            Ingestion statistics.
-        """
+        """Ensure an article is persisted to Milvus."""
         chunk_records = self.chunker.build_chunk_records(
             article,
             chunk_size=chunk_size,
@@ -161,26 +105,7 @@ class ContextRetriever:
         chunk_size: int = 3,
         chunk_overlap: int = 1,
     ) -> Dict[str, Any]:
-        """Retrieve contextualized passages for a user query.
-
-        Parameters
-        ----------
-        scraped_data : dict of str to Any
-            Serialized article payload containing article content.
-        query : str
-            User question to answer.
-        k : int, optional
-            Maximum number of passages to return.
-        chunk_size : int, optional
-            Number of sentences per chunk.
-        chunk_overlap : int, optional
-            Number of overlapping sentences between adjacent chunks.
-
-        Returns
-        -------
-        dict
-            Retrieval payload with passages and diagnostics metadata.
-        """
+        """Retrieve contextualized passages for a user query."""
         article_url = str(scraped_data.get("url", "")).strip()
         title = str(scraped_data.get("title", "")).strip()
         content = str(scraped_data.get("content", "")).strip()
@@ -268,26 +193,7 @@ class ContextRetriever:
         chunk_size: int = 3,
         chunk_overlap: int = 1,
     ) -> Dict[str, Any]:
-        """Retrieve contextualized passages synchronously.
-
-        Parameters
-        ----------
-        scraped_data : dict of str to Any
-            Serialized article payload containing article content.
-        query : str
-            User question to answer.
-        k : int, optional
-            Maximum number of passages to return.
-        chunk_size : int, optional
-            Number of sentences per chunk.
-        chunk_overlap : int, optional
-            Number of overlapping sentences between adjacent chunks.
-
-        Returns
-        -------
-        dict
-            Retrieval payload with passages and diagnostics metadata.
-        """
+        """Retrieve contextualized passages synchronously."""
         return asyncio.run(
             self.retrieve_async(
                 scraped_data=scraped_data,
@@ -306,24 +212,7 @@ class ContextRetriever:
         chunk_size: int,
         chunk_overlap: int,
     ) -> List[RetrievalCandidate]:
-        """Expand Milvus hits with surrounding chunk context.
-
-        Parameters
-        ----------
-        article_url : str
-            Source article URL.
-        raw_hits : sequence of dict of str to Any
-            Normalized Milvus search hits.
-        chunk_size : int
-            Configured chunk size.
-        chunk_overlap : int
-            Configured chunk overlap.
-
-        Returns
-        -------
-        list of RetrievalCandidate
-            Context-expanded retrieval candidates.
-        """
+        """Expand Milvus hits with surrounding chunk context."""
         neighbor_indices = set()
         for hit in raw_hits:
             index = int(hit["chunk_index"])
@@ -389,22 +278,7 @@ class ContextRetriever:
         candidates: Sequence[RetrievalCandidate],
         k: int,
     ) -> List[Dict[str, Any]]:
-        """Apply contextual compression and semantic reranking.
-
-        Parameters
-        ----------
-        query : str
-            User question.
-        candidates : sequence of RetrievalCandidate
-            Vector-search candidates to refine.
-        k : int
-            Final number of passages to return.
-
-        Returns
-        -------
-        list of dict of str to Any
-            Final ranked passages.
-        """
+        """Apply contextual compression and semantic reranking."""
         documents = [candidate.document for candidate in candidates]
         if not documents:
             return []
@@ -495,28 +369,7 @@ class ContextRetriever:
         chunk_overlap: int,
         requested_k: int,
     ) -> Dict[str, Any]:
-        """Build an empty retrieval response payload.
-
-        Parameters
-        ----------
-        query : str
-            User query.
-        article_url : str
-            Source article URL.
-        title : str
-            Source article title.
-        chunk_size : int
-            Configured chunk size.
-        chunk_overlap : int
-            Configured chunk overlap.
-        requested_k : int
-            Requested number of passages.
-
-        Returns
-        -------
-        dict
-            Empty retrieval payload.
-        """
+        """Build an empty retrieval response payload."""
         return {
             "query": query,
             "retrieved_passages": [],

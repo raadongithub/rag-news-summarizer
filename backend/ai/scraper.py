@@ -20,29 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class ScrapedArticle(BaseModel):
-    """Structured article data produced by the scraper.
-
-    Attributes
-    ----------
-    url:
-        Canonical article URL.
-    title:
-        Headline or article title.
-    content:
-        Main cleaned body text.
-    authors:
-        Extracted author names.
-    publish_date:
-        Parsed publication timestamp when available.
-    summary:
-        Optional summary field retained for compatibility.
-    source_domain:
-        Domain derived from the article URL.
-    word_count:
-        Total number of words in the extracted content.
-    extraction_method:
-        Extraction backend that produced the content.
-    """
+    """Structured article data produced by the scraper."""
 
     url: HttpUrl
     title: str = Field(..., min_length=1, description="Article Title")
@@ -74,15 +52,7 @@ class ScrapedArticle(BaseModel):
 
 
 class NewsArticleScraper:
-    """Scrape article content with newspaper4k and BeautifulSoup fallback.
-
-    Parameters
-    ----------
-    timeout:
-        Request timeout in seconds.
-    user_agent:
-        Optional HTTP user agent override.
-    """
+    """Scrape article content with newspaper4k and BeautifulSoup fallback."""
 
     def __init__(self, timeout: int = 30, user_agent: str | None = None):
         self.timeout = timeout
@@ -94,23 +64,7 @@ class NewsArticleScraper:
         self.session.headers.update({"User-Agent": self.user_agent})
 
     def scrape_article(self, url: str) -> ScrapedArticle:
-        """Scrape a URL into a validated article model.
-
-        Parameters
-        ----------
-        url:
-            Article URL to fetch and parse.
-
-        Returns
-        -------
-        ScrapedArticle
-            Validated article payload.
-
-        Raises
-        ------
-        ValueError
-            If both primary and fallback extraction fail.
-        """
+        """Scrape a URL into a validated article model."""
         try:
             article_data = self.scrape_with_newspaper(url)
             return ScrapedArticle(**article_data)
@@ -126,18 +80,7 @@ class NewsArticleScraper:
             raise ValueError(f"Failed to extract article content from {url}") from error
 
     def scrape_with_newspaper(self, url: str) -> dict:
-        """Extract article content using newspaper4k.
-
-        Parameters
-        ----------
-        url:
-            Article URL to fetch and parse.
-
-        Returns
-        -------
-        dict
-            Raw extraction payload suitable for ``ScrapedArticle``.
-        """
+        """Extract article content using newspaper4k."""
         if Article is None:
             raise RuntimeError("newspaper4k Article parser is unavailable in this environment")
 
@@ -167,18 +110,7 @@ class NewsArticleScraper:
             raise
 
     def scrape_with_beautifulsoup(self, url: str) -> dict:
-        """Extract article content using BeautifulSoup selectors.
-
-        Parameters
-        ----------
-        url:
-            Article URL to fetch and parse.
-
-        Returns
-        -------
-        dict
-            Raw extraction payload suitable for ``ScrapedArticle``.
-        """
+        """Extract article content using BeautifulSoup selectors."""
         response = self.session.get(url, timeout=self.timeout)
         response.raise_for_status()
 
@@ -206,13 +138,7 @@ class NewsArticleScraper:
         }
 
     def remove_extras(self, soup: BeautifulSoup) -> None:
-        """Remove boilerplate and non-content elements from a parsed document.
-
-        Parameters
-        ----------
-        soup:
-            Parsed HTML document.
-        """
+        """Remove boilerplate and non-content elements from a parsed document."""
         comments = soup.find_all(string=lambda text: isinstance(text, Comment))
         for comment in comments:
             comment.extract()
@@ -246,18 +172,7 @@ class NewsArticleScraper:
                 element.decompose()
 
     def extract_title(self, soup: BeautifulSoup) -> str:
-        """Extract the best candidate article title from a parsed document.
-
-        Parameters
-        ----------
-        soup:
-            Parsed HTML document.
-
-        Returns
-        -------
-        str
-            Best matching title string or a fallback label.
-        """
+        """Extract the best candidate article title from a parsed document."""
         title_selectors = [
             "h1.entry-title",
             "h1.post-title",
@@ -276,18 +191,7 @@ class NewsArticleScraper:
         return "No title found"
 
     def extract_content(self, soup: BeautifulSoup) -> str:
-        """Extract the main article body from a parsed document.
-
-        Parameters
-        ----------
-        soup:
-            Parsed HTML document.
-
-        Returns
-        -------
-        str
-            Extracted article body text.
-        """
+        """Extract the main article body from a parsed document."""
         content_selectors = [
             "article",
             ".entry-content",
@@ -324,18 +228,7 @@ class NewsArticleScraper:
         return soup.get_text()
 
     def extract_authors(self, soup: BeautifulSoup) -> List[str]:
-        """Extract likely author names from a parsed document.
-
-        Parameters
-        ----------
-        soup:
-            Parsed HTML document.
-
-        Returns
-        -------
-        list of str
-            Candidate author names.
-        """
+        """Extract likely author names from a parsed document."""
         authors = []
         author_selectors = [
             '[class*="author"]',
@@ -363,18 +256,7 @@ class NewsArticleScraper:
         return authors[:1]
 
     def extract_publish_date(self, soup: BeautifulSoup) -> Optional[datetime]:
-        """Extract a publication timestamp from a parsed document.
-
-        Parameters
-        ----------
-        soup:
-            Parsed HTML document.
-
-        Returns
-        -------
-        datetime or None
-            Parsed publication timestamp when found.
-        """
+        """Extract a publication timestamp from a parsed document."""
         date_selectors = [
             "[datetime]",
             '[class*="date"]',
@@ -400,18 +282,7 @@ class NewsArticleScraper:
         return None
 
     def clean_text(self, text: str) -> str:
-        """Normalize extracted article text.
-
-        Parameters
-        ----------
-        text:
-            Raw extracted text.
-
-        Returns
-        -------
-        str
-            Normalized text with noise reduced.
-        """
+        """Normalize extracted article text."""
         if not text:
             return ""
 
@@ -428,12 +299,7 @@ class NewsArticleScraper:
 
 
 def main() -> None:
-    """Run a simple local scraper smoke test.
-
-    Notes
-    -----
-    This helper is intended for manual command-line use.
-    """
+    """Run a simple local scraper smoke test."""
     url = input("Enter Url: ")
     print(f"Scraping URL: {url}")
 

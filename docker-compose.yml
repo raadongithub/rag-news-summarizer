@@ -142,7 +142,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app/backend
-      - ./db_migrations:/app/db_migrations
+      - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}

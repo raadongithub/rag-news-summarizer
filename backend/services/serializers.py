@@ -8,18 +8,7 @@ from ..models import SessionRecord, User
 
 
 def serialize_user(user: User) -> dict[str, Any]:
-    """Convert a user entity to a response payload.
-
-    Parameters
-    ----------
-    user : User
-        User entity to serialize.
-
-    Returns
-    -------
-    dict[str, Any]
-        Serialized user payload.
-    """
+    """Convert a user entity to a response payload."""
 
     return {
         "id": user.id,
@@ -34,18 +23,7 @@ def serialize_session_list_item(record: SessionRecord) -> dict[str, Any]:
 
     Extracts only the fields needed to render a session picker entry: the
     session identifier, the article title (when an article has been loaded),
-    the first user message (used as a fallback label), and timestamps.
-
-    Parameters
-    ----------
-    record : SessionRecord
-        Session entity to serialize.
-
-    Returns
-    -------
-    dict[str, Any]
-        Compact session list-item payload.
-    """
+    the first user message (used as a fallback label), and timestamps."""
 
     article_title: str | None = None
     if record.article_json and isinstance(record.article_json, dict):
@@ -70,18 +48,7 @@ def serialize_session_list_item(record: SessionRecord) -> dict[str, Any]:
 
 
 def serialize_session(record: SessionRecord) -> dict[str, Any]:
-    """Convert a session entity to a response payload.
-
-    Parameters
-    ----------
-    record : SessionRecord
-        Session entity to serialize.
-
-    Returns
-    -------
-    dict[str, Any]
-        Serialized session payload.
-    """
+    """Convert a session entity to a response payload."""
 
     return {
         "id": record.id,

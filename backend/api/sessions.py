@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from ..db import get_db_session
+from ..database import get_db_session
 from ..models import User
 from ..schema import (
     ArticleRequest,
@@ -27,18 +27,7 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
 def _tokenize_for_streaming(answer: str) -> list[str]:
-    """Split a final answer into whitespace-preserving token chunks.
-
-    Parameters
-    ----------
-    answer : str
-        Final assistant answer text.
-
-    Returns
-    -------
-    list[str]
-        Incremental chunks that preserve spacing for UI append behavior.
-    """
+    """Split a final answer into whitespace-preserving token chunks."""
 
     chunks = re.findall(r"\S+\s*", answer)
     return chunks if chunks else [answer]
@@ -49,21 +38,7 @@ def list_sessions(
     current_user: User = Depends(get_current_user),
     db_session: Session = Depends(get_db_session),
 ) -> list[dict]:
-    """Return compact summaries of the authenticated user's recent sessions.
-
-    Parameters
-    ----------
-    current_user : User
-        Authenticated user.
-    db_session : Session
-        Active SQLAlchemy session.
-
-    Returns
-    -------
-    list[dict]
-        Compact session list-item payloads ordered by most recently
-        updated first.
-    """
+    """Return compact summaries of the authenticated user's recent sessions."""
 
     return SessionService(db_session).list_sessions(current_user)
 
@@ -73,20 +48,7 @@ def new_session(
     current_user: User = Depends(get_current_user),
     db_session: Session = Depends(get_db_session),
 ) -> dict:
-    """Create a new session.
-
-    Parameters
-    ----------
-    current_user : User
-        Authenticated user.
-    db_session : Session
-        Active SQLAlchemy session.
-
-    Returns
-    -------
-    dict
-        Serialized session payload.
-    """
+    """Create a new session."""
 
     return SessionService(db_session).create_session(current_user)
 
@@ -97,22 +59,7 @@ def load_session(
     current_user: User = Depends(get_current_user),
     db_session: Session = Depends(get_db_session),
 ) -> dict:
-    """Load an existing session by ID.
-
-    Parameters
-    ----------
-    session_id : str
-        Session identifier.
-    current_user : User
-        Authenticated user.
-    db_session : Session
-        Active SQLAlchemy session.
-
-    Returns
-    -------
-    dict
-        Serialized session payload.
-    """
+    """Load an existing session by ID."""
 
     return SessionService(db_session).get_session(session_id, current_user)
 
@@ -123,22 +70,7 @@ def session_history(
     current_user: User = Depends(get_current_user),
     db_session: Session = Depends(get_db_session),
 ) -> dict:
-    """Return the chat history for a session.
-
-    Parameters
-    ----------
-    session_id : str
-        Session identifier.
-    current_user : User
-        Authenticated user.
-    db_session : Session
-        Active SQLAlchemy session.
-
-    Returns
-    -------
-    dict
-        Chat history payload.
-    """
+    """Return the chat history for a session."""
 
     return SessionService(db_session).get_history(session_id, current_user)
 
@@ -151,26 +83,7 @@ async def load_article(
     current_user: User = Depends(get_current_user),
     db_session: Session = Depends(get_db_session),
 ) -> dict:
-    """Scrape and index an article for a session.
-
-    Parameters
-    ----------
-    session_id : str
-        Session identifier.
-    payload : ArticleRequest
-        Article load payload.
-    request : Request
-        FastAPI request object.
-    current_user : User
-        Authenticated user.
-    db_session : Session
-        Active SQLAlchemy session.
-
-    Returns
-    -------
-    dict
-        Updated session payload.
-    """
+    """Scrape and index an article for a session."""
 
     runtime = getattr(request.app.state, "runtime", None)
     return await SessionService(db_session).load_article(
@@ -187,22 +100,7 @@ async def summarize_article(
     current_user: User = Depends(get_current_user),
     db_session: Session = Depends(get_db_session),
 ) -> dict:
-    """Generate an article summary for a session.
-
-    Parameters
-    ----------
-    session_id : str
-        Session identifier.
-    current_user : User
-        Authenticated user.
-    db_session : Session
-        Active SQLAlchemy session.
-
-    Returns
-    -------
-    dict
-        Updated session payload.
-    """
+    """Generate an article summary for a session."""
 
     return await SessionService(db_session).summarize_article(session_id, current_user)
 
@@ -215,26 +113,7 @@ async def chat(
     current_user: User = Depends(get_current_user),
     db_session: Session = Depends(get_db_session),
 ) -> dict:
-    """Answer a question against the session's article.
-
-    Parameters
-    ----------
-    session_id : str
-        Session identifier.
-    payload : ChatRequest
-        Chat request payload.
-    request : Request
-        FastAPI request object.
-    current_user : User
-        Authenticated user.
-    db_session : Session
-        Active SQLAlchemy session.
-
-    Returns
-    -------
-    dict
-        Answer payload.
-    """
+    """Answer a question against the session's article."""
 
     runtime = getattr(request.app.state, "runtime", None)
     return await SessionService(db_session).answer_question(
@@ -257,37 +136,12 @@ async def chat_stream(
     """Stream a chat answer as incremental token chunks.
 
     Summary generation remains strictly non-streaming and is handled by the
-    summarize endpoint. This route is only for chat token streaming.
-
-    Parameters
-    ----------
-    session_id : str
-        Session identifier.
-    payload : ChatRequest
-        Chat request payload.
-    request : Request
-        FastAPI request object.
-    current_user : User
-        Authenticated user.
-    db_session : Session
-        Active SQLAlchemy session.
-
-    Returns
-    -------
-    StreamingResponse
-        NDJSON stream with token and done events.
-    """
+    summarize endpoint. This route is only for chat token streaming."""
 
     runtime = getattr(request.app.state, "runtime", None)
 
     async def stream_events():
-        """Yield NDJSON events for incremental chat rendering.
-
-        Returns
-        -------
-        AsyncIterator[str]
-            Newline-delimited JSON events.
-        """
+        """Yield NDJSON events for incremental chat rendering."""
 
         try:
             result = await SessionService(db_session).answer_question(

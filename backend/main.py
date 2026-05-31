@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from .api import auth_router, health_router, sessions_router
 from .core.config import get_settings
 from .core.exceptions import ApiError
-from .db import run_migrations
+from .database import run_migrations
 from .services import close_runtime, initialize_runtime
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -25,18 +25,7 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Initialize shared resources on startup and clean up on shutdown.
-
-    Parameters
-    ----------
-    app : FastAPI
-        FastAPI application instance.
-
-    Yields
-    ------
-    None
-        Control is yielded back to the framework after startup.
-    """
+    """Initialize shared resources on startup and clean up on shutdown."""
 
     run_migrations()
     app.state.startup_complete = False
@@ -61,20 +50,7 @@ app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=li
 
 @app.exception_handler(ApiError)
 async def api_error_handler(_: Request, exc: ApiError) -> JSONResponse:
-    """Return structured JSON responses for domain errors.
-
-    Parameters
-    ----------
-    _ : Request
-        FastAPI request object.
-    exc : ApiError
-        Application error to serialize.
-
-    Returns
-    -------
-    JSONResponse
-        Structured API error response.
-    """
+    """Return structured JSON responses for domain errors."""
 
     return JSONResponse(
         status_code=exc.status_code,
@@ -87,20 +63,7 @@ async def api_error_handler(_: Request, exc: ApiError) -> JSONResponse:
 
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
-    """Return structured JSON responses for request validation failures.
-
-    Parameters
-    ----------
-    _ : Request
-        FastAPI request object.
-    exc : RequestValidationError
-        Validation error raised by FastAPI.
-
-    Returns
-    -------
-    JSONResponse
-        Structured validation error response.
-    """
+    """Return structured JSON responses for request validation failures."""
 
     return JSONResponse(
         status_code=422,

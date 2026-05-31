@@ -13,33 +13,16 @@ from ..models import SessionRecord
 _DEFAULT_SESSION_LIST_LIMIT = 20
 
 
-class SessionRepository:
+class SessionQueries:
     """Repository for session persistence operations."""
 
     def __init__(self, db_session: Session) -> None:
-        """Initialize the repository.
-
-        Parameters
-        ----------
-        db_session : Session
-            Active SQLAlchemy session.
-        """
+        """Initialize the repository."""
 
         self.db_session = db_session
 
     def create(self, *, user_id: str) -> SessionRecord:
-        """Create and persist a new session.
-
-        Parameters
-        ----------
-        user_id : str
-            Owning user identifier.
-
-        Returns
-        -------
-        SessionRecord
-            Newly created session record.
-        """
+        """Create and persist a new session."""
 
         record = SessionRecord(
             user_id=user_id,
@@ -51,20 +34,7 @@ class SessionRepository:
         return record
 
     def get_for_user(self, session_id: str, user_id: str) -> SessionRecord | None:
-        """Return a session owned by a given user.
-
-        Parameters
-        ----------
-        session_id : str
-            Session identifier.
-        user_id : str
-            Owning user identifier.
-
-        Returns
-        -------
-        SessionRecord | None
-            Matching session when present.
-        """
+        """Return a session owned by a given user."""
 
         statement = select(SessionRecord).where(
             SessionRecord.id == session_id,
@@ -77,20 +47,7 @@ class SessionRepository:
         user_id: str,
         limit: int = _DEFAULT_SESSION_LIST_LIMIT,
     ) -> list[SessionRecord]:
-        """Return the most recent sessions owned by a user.
-
-        Parameters
-        ----------
-        user_id : str
-            Owning user identifier.
-        limit : int, optional
-            Maximum number of records to return.
-
-        Returns
-        -------
-        list[SessionRecord]
-            Sessions ordered by updated_at descending.
-        """
+        """Return the most recent sessions owned by a user."""
 
         statement = (
             select(SessionRecord)
@@ -101,20 +58,7 @@ class SessionRepository:
         return list(self.db_session.execute(statement).scalars().all())
 
     def update(self, record: SessionRecord, **fields: Any) -> SessionRecord:
-        """Update mutable session fields in place.
-
-        Parameters
-        ----------
-        record : SessionRecord
-            Session record to mutate.
-        **fields : Any
-            Fields to update.
-
-        Returns
-        -------
-        SessionRecord
-            Updated session record.
-        """
+        """Update mutable session fields in place."""
 
         for key, value in fields.items():
             if key == "article":

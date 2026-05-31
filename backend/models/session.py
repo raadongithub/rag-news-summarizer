@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 from typing import TYPE_CHECKING
 
-from ..db.base import Base, TimestampMixin
+from ..database.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from .chat import ChatMessage

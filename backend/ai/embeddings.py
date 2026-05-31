@@ -12,15 +12,7 @@ from .retrieval_config import EmbeddingConfig
 
 
 class VoyageEmbeddingService(Embeddings):
-    """Shared Voyage embedding service with async-safe helpers.
-
-    Parameters
-    ----------
-    api_key : str
-        Voyage API key.
-    config : EmbeddingConfig or None, optional
-        Embedding configuration. Defaults to environment-derived settings.
-    """
+    """Shared Voyage embedding service with async-safe helpers."""
 
     def __init__(
         self,
@@ -31,18 +23,7 @@ class VoyageEmbeddingService(Embeddings):
         self.client = voyageai.Client(api_key=api_key)
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Embed document texts synchronously.
-
-        Parameters
-        ----------
-        texts : list of str
-            Document texts to embed.
-
-        Returns
-        -------
-        list of list of float
-            Dense document embeddings.
-        """
+        """Embed document texts synchronously."""
         if not texts:
             return []
         all_embeddings: List[List[float]] = []
@@ -59,18 +40,7 @@ class VoyageEmbeddingService(Embeddings):
         return all_embeddings
 
     def embed_query(self, text: str) -> List[float]:
-        """Embed a query synchronously.
-
-        Parameters
-        ----------
-        text : str
-            Query text to embed.
-
-        Returns
-        -------
-        list of float
-            Dense query embedding.
-        """
+        """Embed a query synchronously."""
         response = self.client.embed(
             texts=[text],
             model=self.config.model,
@@ -81,31 +51,9 @@ class VoyageEmbeddingService(Embeddings):
         return list(response.embeddings[0])
 
     async def aembed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Embed document texts without blocking the event loop.
-
-        Parameters
-        ----------
-        texts : list of str
-            Document texts to embed.
-
-        Returns
-        -------
-        list of list of float
-            Dense document embeddings.
-        """
+        """Embed document texts without blocking the event loop."""
         return await asyncio.to_thread(self.embed_documents, texts)
 
     async def aembed_query(self, text: str) -> List[float]:
-        """Embed a query without blocking the event loop.
-
-        Parameters
-        ----------
-        text : str
-            Query text to embed.
-
-        Returns
-        -------
-        list of float
-            Dense query embedding.
-        """
+        """Embed a query without blocking the event loop."""
         return await asyncio.to_thread(self.embed_query, text)

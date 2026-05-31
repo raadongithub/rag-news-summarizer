@@ -20,18 +20,7 @@ MIN_SECRET_LENGTH = 32
 
 
 def _ensure_secret_strength(settings: AppConfig) -> None:
-    """Validate minimum access-token secret strength.
-
-    Parameters
-    ----------
-    settings : AppConfig
-        Active application settings.
-
-    Returns
-    -------
-    None
-        Validation succeeds silently.
-    """
+    """Validate minimum access-token secret strength."""
 
     if len(settings.access_token_secret) < MIN_SECRET_LENGTH:
         raise ValidationError(
@@ -40,18 +29,7 @@ def _ensure_secret_strength(settings: AppConfig) -> None:
 
 
 def hash_password(password: str) -> str:
-    """Hash a password using PBKDF2-HMAC-SHA256.
-
-    Parameters
-    ----------
-    password : str
-        Plaintext password.
-
-    Returns
-    -------
-    str
-        Encoded password hash including metadata and salt.
-    """
+    """Hash a password using PBKDF2-HMAC-SHA256."""
 
     salt = secrets.token_bytes(16)
     derived_key = hashlib.pbkdf2_hmac(
@@ -71,20 +49,7 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, encoded_password: str) -> bool:
-    """Verify a plaintext password against a stored hash.
-
-    Parameters
-    ----------
-    password : str
-        Plaintext password to verify.
-    encoded_password : str
-        Stored password hash.
-
-    Returns
-    -------
-    bool
-        True when the password matches the stored hash.
-    """
+    """Verify a plaintext password against a stored hash."""
 
     try:
         scheme, iterations_text, salt_text, hash_text = encoded_password.split("$", maxsplit=3)
@@ -106,20 +71,7 @@ def verify_password(password: str, encoded_password: str) -> bool:
 
 
 def create_access_token(user_id: str, settings: AppConfig | None = None) -> str:
-    """Create a signed access token for a user.
-
-    Parameters
-    ----------
-    user_id : str
-        User identifier to encode.
-    settings : AppConfig | None, optional
-        Optional settings override.
-
-    Returns
-    -------
-    str
-        Encoded JWT access token.
-    """
+    """Create a signed access token for a user."""
 
     resolved_settings = settings or get_settings()
     _ensure_secret_strength(resolved_settings)
@@ -138,25 +90,7 @@ def create_access_token(user_id: str, settings: AppConfig | None = None) -> str:
 
 
 def decode_access_token(token: str, settings: AppConfig | None = None) -> dict[str, str | int]:
-    """Decode and validate an access token.
-
-    Parameters
-    ----------
-    token : str
-        Encoded JWT access token.
-    settings : AppConfig | None, optional
-        Optional settings override.
-
-    Returns
-    -------
-    dict[str, str | int]
-        Decoded token payload.
-
-    Raises
-    ------
-    AuthenticationError
-        Raised when the token is invalid or expired.
-    """
+    """Decode and validate an access token."""
 
     resolved_settings = settings or get_settings()
     _ensure_secret_strength(resolved_settings)
